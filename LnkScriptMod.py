@@ -11,9 +11,8 @@ import bellagio.SystemLib.testbed_logging.testbedlog as tblog
 from bellagio.SystemLib.TestbedException.BellagioError import BellagioError
 from bellagio.SystemLib.LnK.bin2lnk import Bin2Lnk
 import os
-import time
-import new
 import re
+import datetime
 from __builtin__ import classmethod
 
 class LnkScriptMod(object):
@@ -34,18 +33,18 @@ class LnkScriptMod(object):
         #default sys file
         self.sys_file = r'A110.11.12_B71214_KN_VQ_SysConfigSWIRE.bin'
         self.sys_txt_file = os.path.splitext(self.sys_file)[0] + r'_32Bit_1ch.txt'
-        self.sys_xml_file = os.path.splitext(self.sys_file)[0] + r'.xml'
+        self.sys_xml_file = r'DP_DL_'+os.path.splitext(self.sys_file)[0] + r'.xml'
 
         #default fw file
         self.fw_file = r'A110.11.12_B71214_KN_VQ_BoskoAppSWIRE.bin'
         self.fw_txt_file = os.path.splitext(self.fw_file)[0] + r'_32Bit_1ch.txt'
-        self.fw_xml_file = os.path.splitext(self.fw_file)[0] + r'.xml'
+        self.fw_xml_file = r'DP_DL_'+os.path.splitext(self.fw_file)[0] + r'.xml'
 
         self.sys_xml_template_file = r'FW_DL_DP_SysConfig.xml'
-        self.sys_txt_replace = r'KN_VQ_SysConfigSWIRE_32Bit_1ch.txt'
+        self.sys_txt_replace = r'SYS_CONFIG.txt'
 
         self.fw_xml_template_file = r'FW_DL_DP_BoskoApp.xml'
-        self.fw_txt_replace = r'KN_VQ_BoskoAppSWIRE_32Bit_1ch.txt'
+        self.fw_txt_replace = r'BOSKO_FW.txt'
 
         #control port related script template file
         self.cp_header_file = r'CP_DL_header.xml'
@@ -53,7 +52,6 @@ class LnkScriptMod(object):
         self.cp_dl_sys_file = r'CP_DL_' + os.path.splitext(self.sys_file)[0] + r'.xml'
         self.cp_dl_fw_file = r'CP_DL_' + os.path.splitext(self.fw_file)[0] + r'.xml'
 
-        #self.bin2lnk = r'c:\ProgramData\Bellagio\bin2lnk\bin2lnk.exe'
         self.output_path = r'c:\ProgramData\Bellagio\\'
         self.tmp_txt = r"tmp.txt"
         self.char_size = 2  #size of one ascii "char"
@@ -78,16 +76,18 @@ class LnkScriptMod(object):
             output_dir: output directory
             sys_xml:    data port sys config download script file name
             fw_xml:     data port bosko fw download script file name
+            cp_header:  cp dl script header
+            cp_content: cp dl script content
         '''
         if sys_name:
             self.sys_file = sys_name
             self.sys_txt_file = os.path.splitext(self.sys_file)[0] + r'_32Bit_1ch.txt'
-            self.sys_xml_file = os.path.splitext(self.sys_file)[0] + r'.xml'
+            self.sys_xml_file = r'DP_DL_' + os.path.splitext(self.sys_file)[0] + r'.xml'
             self.cp_dl_sys_file = r'CP_DL_' + os.path.splitext(self.sys_file)[0] + r'.xml'
         if fw_name:
             self.fw_file = fw_name
             self.fw_txt_file = os.path.splitext(self.fw_file)[0] + r'_32Bit_1ch.txt'
-            self.fw_xml_file = os.path.splitext(self.fw_file)[0] + r'.xml'
+            self.fw_xml_file = r'DP_DL_' + os.path.splitext(self.fw_file)[0] + r'.xml'
             self.cp_dl_fw_file = r'CP_DL_' + os.path.splitext(self.fw_file)[0] + r'.xml'
         if output_dir:
             self.output_path = output_dir
@@ -115,51 +115,47 @@ class LnkScriptMod(object):
         bin2lnk.bin2Dp(self.output_path+self.fw_file, self.output_path+self.fw_txt_file)
 
         tblog.infoLog("LnkScriptMod: converted bin to data port data file!")
-        '''
-        #obsoleted: call "bin2lnk.exe" to convert
-        cd_cmd = 'cd ' + self.output_path + ' & '
-        cmd = cd_cmd + self.bin2lnk + ' -file ' + self.sys_file + ' -fw -dp'
-        output_bin = subprocess.Popen(cmd, shell=True)
-        time.sleep(1)
-
-        if not os.path.isfile(self.output_path + self.fw_file):
-            raise BellagioError("Could not find Bosko FW bin!")
-        cmd = cd_cmd + self.bin2lnk + ' -file ' + self.fw_file + ' -fw -dp'
-        output_bin = subprocess.Popen(cmd, shell=True)
-        time.sleep(1)
-        '''
 
     def modDataPortScript(self):
         '''
         modify LnK data port script template to update downloadable data file
         '''
         if not os.path.isfile(self.output_path + self.sys_xml_template_file):
-            raise BellagioError("Could not find LnK script xml file for sys config!")
+            raise BellagioError("Could not find LnK DP DL script file for sys config!")
 
-        #replacements = {self.sys_txt_replace:self.sys_txt_file}
+        '''
+        ###convert binary to DP DL file
+        '''
+        self.bin2Dat()
+
+        ###replace sys_config txt in DP download script template
         with open(self.output_path + self.sys_xml_template_file) as infile, open(self.output_path+self.sys_xml_file, 'w') as outfile:
             for line in infile:
-                new_line = line.replace(self.sys_txt_replace, self.sys_txt_file)
-                if new_line != line:
-                    tblog.infoLog("LnkScriptMod: Sys Config file name updated!")
-                '''
-                for src, target in replacements.iteritems():
-                    line = line.replace(src, target)
-                    line_count += 1
-                '''
-                outfile.write(new_line)
+                if re.search(self.sys_txt_replace, line):
+                    #update DP DL txt file
+                    line = line.replace(self.sys_txt_replace, self.output_path+self.sys_txt_file)
+                elif re.search('_DATE_', line):
+                    #update date
+                    line = line.replace("_DATE_", datetime.datetime.now().strftime("%m/%d/%Y"))
+                outfile.write(line)
+
         infile.close()
         outfile.close()
 
+        ###replace bosko_fw txt in DP download script template
         if not os.path.isfile(self.output_path + self.fw_xml_template_file):
-            raise BellagioError("Could not find LnK script xml file! for bosko fw")
+            raise BellagioError("Could not find LnK script xml file for bosko fw!")
 
         with open(self.output_path + self.fw_xml_template_file) as infile, open(self.output_path+self.fw_xml_file, 'w') as outfile:
             for line in infile:
-                new_line = line.replace(self.fw_txt_replace, self.fw_txt_file)
-                if new_line != line:
-                    tblog.infoLog("LnkScriptMod: Bosko FW file name updated!")
-                outfile.write(new_line)
+                if re.search(self.fw_txt_replace, line):
+                    #update DP DL txt file
+                    line = line.replace(self.fw_txt_replace, self.output_path+self.sys_txt_file)
+                elif re.search('_DATE_', line):
+                    #update date
+                    line = line.replace("_DATE_", datetime.datetime.now().strftime("%m/%d/%Y"))
+                outfile.write(line)
+
         infile.close()
         outfile.close()
 
@@ -194,12 +190,19 @@ class LnkScriptMod(object):
                 '''
                 ###write header file to output till last line
                 '''
-                if not re.search('(?<=/Generate)', header_line):
-                    #write header to output and scan event number
+                if not re.search('Command', header_line):
+                    '''
+                    #1. write header to output
+                    #2. scan event number
+                    #3. update current date
+                    '''
                     found = re.search('(?<=Event #)\w+', header_line)
                     if found:
                         event_str = found.group(0)
                         #tblog.infoLog("event number: {0}" .format(event_str))
+                    if re.search('_DATE_', header_line):
+                        #update date
+                        header_line = header_line.replace("_DATE_", datetime.datetime.now().strftime("%m/%d/%Y"))
                     #tblog.infoLog("{0}" .format(header_line))
                     cp_dl_out.write(header_line)
                 else:
@@ -223,29 +226,46 @@ class LnkScriptMod(object):
                         with open(self.output_path + self.cp_content_file) as cp_content:
                             for line in cp_content:
                                 if re.search('event_num', line):
-                                    #update event#
+                                    '''
+                                    ###update event
+                                    '''
                                     new_line = line.replace("event_num", str(event_num))
                                     event_num += 1
                                 elif re.search('reg_addr', line) and re.search('data', line):
-                                    #update register address and data
+                                    '''
+                                    ###update register address and data
+                                    '''
                                     new_line1 = line.replace("reg_addr", str(reg_addr))
                                     new_line = new_line1.replace("data", l[data_count*2] + l[data_count*2+1])
                                     #tblog.infoLog("reg_addr: {0} data: {1}" .format(reg_addr, l[data_count*2] + l[data_count*2+1]))
                                     data_count += 1
                                     reg_addr += 1
                                 else:
-                                    #do nothing
+                                    '''
+                                    ###do nothing
+                                    '''
+                                    if re.search('Delay of about 2 us', line):
+                                        ###add one frame delay?
+                                        event_num += 1
                                     new_line = line
                                 cp_dl_out.write(new_line)
                         cp_content.close()
 
-                        #loop data file
+                        '''
+                        ###loop data file
+                        '''
                         dword = input_data.read(self.dword_size)
                         #tblog.infoLog("dword read: {0}" .format(dword))
-                        #break   #debug...
-
-                    #last line of header file
+                        #break   ###debug...
+                    ###write "<Command>" line
                     cp_dl_out.write(header_line)
+                    #break       ###break "for" loop
+            '''
+            ###last two lines
+            cp_dl_out.write(r"</Command>")
+            cp_dl_out.write("\n\n")
+            cp_dl_out.write(r"</Generate>")
+            '''
 
         cp_header.close()
         cp_dl_out.close()
@@ -253,13 +273,20 @@ class LnkScriptMod(object):
         os.remove(self.tmp_txt)
         tblog.infoLog("LnkScriptMod: converted bin to control port script file{0}!" .format(cp_dl_script))
 
+    def genCtrlPortScript(self):
+        if not os.path.isfile(self.output_path + self.sys_file):
+            raise BellagioError("Could not find sys config bin!")
+        self.bin2CtrlPort(self.output_path+self.sys_file, self.output_path+self.cp_dl_sys_file)
+
+        if not os.path.isfile(self.output_path + self.fw_file):
+            raise BellagioError("Could not find Bosko FW bin!")
+        self.bin2CtrlPort(self.output_path+self.fw_file, self.output_path+self.cp_dl_fw_file)
+
 if __name__ == "__main__":
     tblog.setDebugMode(True)
     lnkMod = LnkScriptMod.getInstance()
     #data port file
-    lnkMod.bin2Dat()
     lnkMod.modDataPortScript()
-    #control port file
-    lnkMod.bin2CtrlPort(lnkMod.output_path+lnkMod.sys_file, lnkMod.output_path+lnkMod.cp_dl_sys_file)
-    lnkMod.bin2CtrlPort(lnkMod.output_path+lnkMod.fw_file, lnkMod.output_path+lnkMod.cp_dl_fw_file)
+    #control port script
+    lnkMod.genCtrlPortScript()
 
