@@ -15,6 +15,77 @@ import re
 import datetime
 from __builtin__ import classmethod
 
+route3_swire_properties = {
+    '_DP3_WORDLENGTH_'   : 23,
+    '_DP3_INTERVAL_LO_'  : 0xff,
+    '_DP3_INTERVAL_HI_'  : 0x01,
+    '_DP3_BLOCK_OFFSET_' : 0x00,
+    '_DP3_HCTRL_'        : 0x11,
+    '_DP1_WORDLENGTH_'   : 23,
+    '_DP1_INTERVAL_LO_'  : 0xff,
+    '_DP1_INTERVAL_HI_'  : 0x01,
+    '_DP1_BLOCK_OFFSET_' : 0x00,
+    '_DP1_HCTRL_'        : 0x11,
+    '_SCP_FRAMECTRL_'    : 0x08 }
+
+###shapiro register(0x8030) value for different sample rate(KHz)
+samplerate_reg_val = {
+    8   : 0,
+    16  : 1,
+    24  : 2,
+    32  : 3,
+    48  : 4,
+    96  : 5,
+    192 : 6 }
+
+'''
+LUT of swire frame shape for different sample rate data stream
+    Since there can be more than one setup, the idea here is to keep 'frame rate' = 'sample rate'.
+    Then we can simply enable SSP for every frame.
+
+    'sample_rate(KHz)' : [row, col, DP3_HStart, DP3_HStop, DP3_Offset, DP1_HStart, DP1_HStop, DP1_Offset]
+'''
+route3_frame_shape_index = {    #this is index for frame shape value in LUT
+    'row'           : 0,
+    'col'           : 1,
+    'dp3_hstart'    : 2,
+    'dp3_hstop'     : 3,
+    'dp3_offset'    : 4,
+    'dp1_hstart'    : 5,
+    'dp1_hstop'     : 6,
+    'dp1_offset'    : 7}
+
+route3_frame_shape_lut = {
+    8   : [256, 12, 1, 1, 0, 2, 2, 0],
+    16  : [128, 12, 1, 1, 0, 2, 2, 0],
+    24  : [64, 16, 1, 1, 0, 2, 2, 0],
+    32  : [64, 12, 1, 1, 0, 2, 2, 0],
+    48  : [64, 8, 1, 1, 0, 2, 2, 0],
+    96  : [64, 4, 1, 1, 0, 2, 2, 0],
+    192 : [64, 2, 1, 1, 0, 1, 1, 16] }
+
+'''
+Swire SCP_FrameCtrl value for rows and cols
+'''
+swire_rows_ctrl = {
+    48 : 0,
+    50 : 1,
+    60 : 2,
+    64 : 3,
+    128 : 11,
+    192 : 16,
+    256 : 19 }  #only part of the table
+
+swire_cols_ctrl = {
+    2 : 0,
+    4 : 1,
+    6 : 2,
+    8 : 3,
+    10 : 4,
+    12 : 5,
+    14 : 6,
+    16 : 7 }
+
 class LnkScriptMod(object):
     '''
     Singleton class to manipulate LnK script xml file
@@ -23,13 +94,17 @@ class LnkScriptMod(object):
     
     _instance = None
     
-    
     def __new__(cls, *args, **kwargs):
         if not cls._instance:
             cls._instance = super(LnkScriptMod, cls).__new__(cls, *args, **kwargs)
         return cls._instance
 
     def __init__(self):
+        '''
+        ##############################################################
+            swire FW download
+        ##############################################################
+        '''
         #default sys file
         self.sys_file = r'A110.11.12_B71214_KN_VQ_SysConfigSWIRE.bin'
         self.sys_txt_file = os.path.splitext(self.sys_file)[0] + r'_32Bit_1ch.txt'
@@ -40,19 +115,41 @@ class LnkScriptMod(object):
         self.fw_txt_file = os.path.splitext(self.fw_file)[0] + r'_32Bit_1ch.txt'
         self.fw_xml_file = r'DP_DL_'+os.path.splitext(self.fw_file)[0] + r'.xml'
 
+        #data port downloading script template file
         self.sys_xml_template_file = r'FW_DL_DP_SysConfig.xml'
         self.sys_txt_replace = r'SYS_CONFIG.txt'
 
         self.fw_xml_template_file = r'FW_DL_DP_BoskoApp.xml'
         self.fw_txt_replace = r'BOSKO_FW.txt'
 
-        #control port related script template file
+        #control port downloading script template file
         self.cp_header_file = r'CP_DL_header.xml'
         self.cp_content_file = r'CP_DL_content.xml'
         self.cp_dl_sys_file = r'CP_DL_' + os.path.splitext(self.sys_file)[0] + r'.xml'
         self.cp_dl_fw_file = r'CP_DL_' + os.path.splitext(self.fw_file)[0] + r'.xml'
 
-        self.output_path = r'c:\ProgramData\Bellagio\\'
+        '''
+        ##############################################################
+            swire route
+        ##############################################################
+        '''
+        #route setup script template file
+        self.route3_template = r'r3_template.xml'
+        self.route3_script = r'route3_setup.xml'
+
+        #route setup properties
+        self.swire_bitrate = 24576 #K : default 12.288MHZ with double date rate
+        self.route3_wordlength = 24  #bit
+        self.route3_samplerate = 48  #KHz
+        self.route3_rows = 48
+        self.route3_cols = 2
+
+        '''
+        ##############################################################
+            general
+        ##############################################################
+        '''
+        self.output_path = r'c:\work\soundwire\autotest\\'
         self.tmp_txt = r"tmp.txt"
         self.char_size = 2  #size of one ascii "char"
         self.dword_size = self.char_size*4  #size of one ascii "dword"(CP send a DWORD every time)
@@ -259,13 +356,6 @@ class LnkScriptMod(object):
                         #break   ###debug...
                     ###write "<Command>" line
                     cp_dl_out.write(header_line)
-                    #break       ###break "for" loop
-            '''
-            ###last two lines
-            cp_dl_out.write(r"</Command>")
-            cp_dl_out.write("\n\n")
-            cp_dl_out.write(r"</Generate>")
-            '''
 
         cp_header.close()
         cp_dl_out.close()
@@ -282,11 +372,142 @@ class LnkScriptMod(object):
             raise BellagioError("Could not find Bosko FW bin!")
         self.bin2CtrlPort(self.output_path+self.fw_file, self.output_path+self.cp_dl_fw_file)
 
+    def updateSwireSetting(self, sample_rate, word_length):
+        '''
+        update swire related settings according to current audio
+        '''
+        tblog.infoLog("route3 swire update: {0} {1}" .format(sample_rate, word_length))
+
+        self.route3_wordlength = word_length - 1    #number: length - 1
+        self.route3_samplerate = sample_rate
+
+        if sample_rate == 192:
+            '''
+            Only 192KHz, we need to change DP1 offset to fit two streams in one column
+            For other sample rate, we put each stream in one column
+            '''
+            route3_frame_shape_lut[192][route3_frame_shape_index['dp1_offset']] = self.route3_wordlength + 1
+            tblog.infoLog("route3 192K frame: {0}" .format(route3_frame_shape_lut[192]))
+
+        self.route3_rows = route3_frame_shape_lut[sample_rate][route3_frame_shape_index['row']]
+        self.route3_cols = route3_frame_shape_lut[sample_rate][route3_frame_shape_index['col']]
+
+        #for SCP_FrameCtrl register
+        rows_ctrl = swire_rows_ctrl[self.route3_rows]
+        cols_ctrl = swire_cols_ctrl[self.route3_cols]
+
+        #in our case(frame rate = sample rate), sample interval = frame size
+        sample_interval = (self.route3_rows * self.route3_cols) - 1
+
+        route3_swire_properties['_DP3_WORDLENGTH_'] = self.route3_wordlength
+        route3_swire_properties['_DP3_INTERVAL_LO_'] = sample_interval & 0xff
+        route3_swire_properties['_DP3_INTERVAL_HI_'] = (sample_interval >> 8) & 0xff
+        route3_swire_properties['_DP3_BLOCK_OFFSET_'] = route3_frame_shape_lut[sample_rate][route3_frame_shape_index['dp3_offset']]
+        route3_swire_properties['_DP3_HCTRL_'] = (route3_frame_shape_lut[sample_rate][route3_frame_shape_index['dp3_hstart']] << 4) + (route3_frame_shape_lut[sample_rate][route3_frame_shape_index['dp3_hstop']] & 0xf)
+
+        route3_swire_properties['_DP1_WORDLENGTH_'] = self.route3_wordlength
+        route3_swire_properties['_DP1_INTERVAL_LO_'] = sample_interval & 0xff
+        route3_swire_properties['_DP1_INTERVAL_HI_'] = (sample_interval >> 8) & 0xff
+        route3_swire_properties['_DP1_BLOCK_OFFSET_'] = route3_frame_shape_lut[sample_rate][route3_frame_shape_index['dp1_offset']]
+        route3_swire_properties['_DP1_HCTRL_'] = (route3_frame_shape_lut[sample_rate][route3_frame_shape_index['dp1_hstart']] << 4) + (route3_frame_shape_lut[sample_rate][route3_frame_shape_index['dp1_hstop']] & 0xf)
+
+        route3_swire_properties['_SCP_FRAMECTRL_'] = (rows_ctrl << 3) + cols_ctrl
+        tblog.infoLog("route3 swire frame control: 0x{0:02x}" .format(route3_swire_properties['_SCP_FRAMECTRL_']))
+
+    def setupRouteScript(self, template, sample_rate, word_length, frame_size):
+        '''
+        Setup route script from template
+        '''
+
+        self.updateSwireSetting(sample_rate, word_length)
+        tblog.infoLog("route3 swire updated")
+
+        #when frame_size = 0.5ms, set shapiro 0x8035 = 0
+        if frame_size < 1:
+            frame_size = 0
+
+        #gen route script name
+        route_script = self.output_path + r'route\\' + os.path.splitext(self.route3_script)[0] + '_' + str(sample_rate) + 'K_' + str(word_length) + 'bit_' + str(frame_size) + 'ms.xml'
+
+        start_swire_setup = 0
+        with open(template) as route_in, open(route_script, 'w') as route_out:
+            for line in route_in:
+                '''
+                update swire channel setup
+                '''
+                if re.search('start swire channel setup', line):
+                    start_swire_setup = 1
+                elif re.search('end swire channel setup', line):
+                    start_swire_setup = 0
+
+                if start_swire_setup:
+                    #fill in swire channel/DP properties from table
+                    for (k, v) in route3_swire_properties.items():
+                        if re.search(k, line):
+                            line = line.replace(k, ("0x{0:02X}" .format(v)))
+                            tblog.infoLog("route3 swire updated: {0}" .format(line))
+                            break;
+                else:
+                    line_updated = 1
+                    if re.search('_DATE_', line):
+                        #update date
+                        line = line.replace("_DATE_", datetime.datetime.now().strftime("%m/%d/%Y"))
+                    elif re.search('_INTERVAL_', line):
+                        #update sample interval in swire stream definition
+                        line = line.replace("_INTERVAL_", str(self.route3_rows * self.route3_cols))
+                    elif re.search('_FRAME_RATE_', line):
+                        #update frame rate in swire stream definition
+                        line = line.replace("_FRAME_RATE_", str(sample_rate))
+                    elif re.search('_FRAME_SIZE_', line):
+                        #update frame size for shapiro
+                        line = line.replace("_FRAME_SIZE_", str(frame_size))
+                    elif re.search('_SAMPLE_RATE_', line):
+                        #update sample rate for shapiro
+                        line = line.replace("_SAMPLE_RATE_", str(samplerate_reg_val[sample_rate]))
+                    elif re.search('_ROUTE_NUM_', line):
+                        #update route number for shapiro
+                        line = line.replace("_ROUTE_NUM_", str(3))
+                    elif re.search('_STREAM_ROWS_', line) or re.search('_STREAM_COLS_', line) or re.search('_LOOP_FRAME_', line):
+                        #update stream frame shape rows and cols
+                        line = line.replace("_STREAM_ROWS_", str(self.route3_rows))
+                        line = line.replace("_STREAM_COLS_", str(self.route3_cols))
+                        '''
+                        update frame loop
+                        FIXME: Should be LCM of frame_rate and 15(frames of dynamic sync period)
+                               Here use frame_rate*15 temporarily
+                        '''
+                        line = line.replace("_LOOP_FRAME_", str(self.route3_samplerate * 15))
+                    else:
+                        line_updated = 0
+
+                    if line_updated:
+                        tblog.infoLog("route3 updated: {0}" .format(line))
+
+                route_out.write(line)
+
+        route_in.close()
+        route_out.close()
+
+    def genRouteScript(self):
+        '''
+        Generate Shapiro swire route setup script for LnK
+        '''
+        if not os.path.isfile(self.output_path + r'route\\' + self.route3_template):
+            raise BellagioError("Could not find route template file!")
+
+        self.setupRouteScript(self.output_path + r'route\\' + self.route3_template, 24, 16, 2)
+        self.setupRouteScript(self.output_path + r'route\\' + self.route3_template, 32, 16, 2)
+        self.setupRouteScript(self.output_path + r'route\\' + self.route3_template, 48, 16, 2)
+        self.setupRouteScript(self.output_path + r'route\\' + self.route3_template, 96, 16, 2)
+        self.setupRouteScript(self.output_path + r'route\\' + self.route3_template, 192, 24, 1)
+
 if __name__ == "__main__":
     tblog.setDebugMode(True)
     lnkMod = LnkScriptMod.getInstance()
-    #data port file
-    lnkMod.modDataPortScript()
-    #control port script
-    lnkMod.genCtrlPortScript()
+    ###data port script
+    #lnkMod.modDataPortScript()
+    ###control port script
+    #lnkMod.genCtrlPortScript()
+    ###route setup script
+    lnkMod.genRouteScript()
 
