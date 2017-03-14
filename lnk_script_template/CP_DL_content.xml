@@ -1,0 +1,31 @@
+<!-- Event #event_num : Frame Start -->
+<Swframe Repeat="1" rows="48" cols="2" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >
+   <!-- Event #event_num : WRITE -->
+   <controlword opcode="3" DeviceAddress="1" RegisterAddress="0xreg_addr" Data="0xdata" />
+</Swframe>
+ 
+<!-- Event #event_num : Frame Start -->
+<Swframe Repeat="1" rows="48" cols="2" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >
+   <!-- Event #event_num : WRITE -->
+   <controlword opcode="3" DeviceAddress="1" RegisterAddress="0xreg_addr" Data="0xdata" />
+</Swframe>
+ 
+<!-- Event #event_num : Frame Start -->
+<Swframe Repeat="1" rows="48" cols="2" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >
+   <!-- Event #event_num : WRITE -->
+   <controlword opcode="3" DeviceAddress="1" RegisterAddress="0xreg_addr" Data="0xdata" />
+</Swframe>
+ 
+<!-- Event #event_num : Frame Start -->
+<Swframe Repeat="1" rows="48" cols="2" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >
+   <!-- Event #event_num : WRITE -->
+   <controlword opcode="3" DeviceAddress="1" RegisterAddress="0xreg_addr" Data="0xdata" />
+   <Comment="Delay of about 2 us."/>
+</Swframe>
+ 
+<!-- Event #event_num : Frame Start -->
+<Swframe Repeat="1" rows="48" cols="2" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >
+   <!-- Event #event_num : PING -->
+   <controlword opcode="0" ssp="0" breq="0" brel="0" reserved="0" />
+</Swframe>
+ 
