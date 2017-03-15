@@ -26,7 +26,9 @@ route3_swire_properties = {
     '_DP1_INTERVAL_HI_'  : 0x01,
     '_DP1_BLOCK_OFFSET_' : 0x00,
     '_DP1_HCTRL_'        : 0x11,
-    '_SCP_FRAMECTRL_'    : 0x08 }
+    '_SCP_FRAMECTRL_'    : 0x08,
+    '_CHANNEL_PREPARE_'  : 0x01,
+    '_CHANNEL_EN_'       : 0x01}
 
 ###shapiro register(0x8030) value for different sample rate(KHz)
 samplerate_reg_val = {
@@ -45,7 +47,7 @@ LUT of swire frame shape for different sample rate data stream
 
     'sample_rate(KHz)' : [row, col, DP3_HStart, DP3_HStop, DP3_Offset, DP1_HStart, DP1_HStop, DP1_Offset]
 '''
-route3_frame_shape_index = {    #this is index for frame shape value in LUT
+frame_shape_index = {    #this is index for frame shape value in LUT
     'row'           : 0,
     'col'           : 1,
     'dp3_hstart'    : 2,
@@ -134,15 +136,15 @@ class LnkScriptMod(object):
         ##############################################################
         '''
         #route setup script template file
-        self.route3_template = r'r3_template.xml'
-        self.route3_script = r'route3_setup.xml'
+        self.route_template = r'route_template.xml'
+        self.route_script = r'setup_route.xml'
 
         #route setup properties
         self.swire_bitrate = 24576 #K : default 12.288MHZ with double date rate
-        self.route3_wordlength = 24  #bit
-        self.route3_samplerate = 48  #KHz
-        self.route3_rows = 48
-        self.route3_cols = 2
+        self.swire_wordlength = 24  #bit
+        self.swire_samplerate = 48  #KHz
+        self.swire_rows = 48
+        self.swire_cols = 2
 
         '''
         ##############################################################
@@ -376,68 +378,76 @@ class LnkScriptMod(object):
         '''
         calculate how many frames we need for a period of time(ms)
         '''
-        return delay_time * self.route3_samplerate
+        return delay_time * self.swire_samplerate
 
-    def updateSwireSetting(self, sample_rate, word_length):
+    def updateSwireSetting(self, channel_num, sample_rate, word_length):
         '''
         update swire related settings according to current audio
         '''
         tblog.infoLog("route3 swire update: {0} {1}" .format(sample_rate, word_length))
 
-        self.route3_wordlength = word_length - 1    #number: length - 1
-        self.route3_samplerate = sample_rate
+        self.swire_wordlength = word_length - 1    #number: length - 1
+        self.swire_samplerate = sample_rate
 
         if sample_rate == 192:
             '''
             Only 192KHz, we need to change DP1 offset to fit two streams in one column
             For other sample rate, we put each stream in one column
             '''
-            frame_shape_lut[192][route3_frame_shape_index['dp1_offset']] = self.route3_wordlength + 1
+            frame_shape_lut[192][frame_shape_index['dp1_offset']] = self.swire_wordlength + 1
             tblog.infoLog("route3 192K frame: {0}" .format(frame_shape_lut[192]))
 
-        self.route3_rows = frame_shape_lut[sample_rate][route3_frame_shape_index['row']]
-        self.route3_cols = frame_shape_lut[sample_rate][route3_frame_shape_index['col']]
+        self.swire_rows = frame_shape_lut[sample_rate][frame_shape_index['row']]
+        self.swire_cols = frame_shape_lut[sample_rate][frame_shape_index['col']]
 
         #for SCP_FrameCtrl register
-        rows_ctrl = swire_rows_ctrl[self.route3_rows]
-        cols_ctrl = swire_cols_ctrl[self.route3_cols]
+        rows_ctrl = swire_rows_ctrl[self.swire_rows]
+        cols_ctrl = swire_cols_ctrl[self.swire_cols]
 
         #in our case(frame rate = sample rate), sample interval = frame size
-        sample_interval = (self.route3_rows * self.route3_cols) - 1
+        sample_interval = (self.swire_rows * self.swire_cols) - 1
 
-        route3_swire_properties['_DP3_WORDLENGTH_'] = self.route3_wordlength
+        route3_swire_properties['_DP3_WORDLENGTH_'] = self.swire_wordlength
         route3_swire_properties['_DP3_INTERVAL_LO_'] = sample_interval & 0xff
         route3_swire_properties['_DP3_INTERVAL_HI_'] = (sample_interval >> 8) & 0xff
-        route3_swire_properties['_DP3_BLOCK_OFFSET_'] = frame_shape_lut[sample_rate][route3_frame_shape_index['dp3_offset']]
-        route3_swire_properties['_DP3_HCTRL_'] = (frame_shape_lut[sample_rate][route3_frame_shape_index['dp3_hstart']] << 4) + (frame_shape_lut[sample_rate][route3_frame_shape_index['dp3_hstop']] & 0xf)
+        route3_swire_properties['_DP3_BLOCK_OFFSET_'] = frame_shape_lut[sample_rate][frame_shape_index['dp3_offset']]
+        route3_swire_properties['_DP3_HCTRL_'] = (frame_shape_lut[sample_rate][frame_shape_index['dp3_hstart']] << 4) + (frame_shape_lut[sample_rate][frame_shape_index['dp3_hstop']] & 0xf)
 
-        route3_swire_properties['_DP1_WORDLENGTH_'] = self.route3_wordlength
+        route3_swire_properties['_DP1_WORDLENGTH_'] = self.swire_wordlength
         route3_swire_properties['_DP1_INTERVAL_LO_'] = sample_interval & 0xff
         route3_swire_properties['_DP1_INTERVAL_HI_'] = (sample_interval >> 8) & 0xff
-        route3_swire_properties['_DP1_BLOCK_OFFSET_'] = frame_shape_lut[sample_rate][route3_frame_shape_index['dp1_offset']]
-        route3_swire_properties['_DP1_HCTRL_'] = (frame_shape_lut[sample_rate][route3_frame_shape_index['dp1_hstart']] << 4) + (frame_shape_lut[sample_rate][route3_frame_shape_index['dp1_hstop']] & 0xf)
+        route3_swire_properties['_DP1_BLOCK_OFFSET_'] = frame_shape_lut[sample_rate][frame_shape_index['dp1_offset']]
+        route3_swire_properties['_DP1_HCTRL_'] = (frame_shape_lut[sample_rate][frame_shape_index['dp1_hstart']] << 4) + (frame_shape_lut[sample_rate][frame_shape_index['dp1_hstop']] & 0xf)
 
         route3_swire_properties['_SCP_FRAMECTRL_'] = (rows_ctrl << 3) + cols_ctrl
         tblog.infoLog("route3 swire frame control: 0x{0:02x}" .format(route3_swire_properties['_SCP_FRAMECTRL_']))
+        if channel_num == 2:
+            route3_swire_properties['_CHANNEL_PREPARE_'] = 3
+            route3_swire_properties['_CHANNEL_EN_'] = 3
+            tblog.infoLog("route channel control: 0x{0:02x}" .format(route3_swire_properties['_CHANNEL_EN_']))
 
-    def setupRouteScript(self, template_dir, sample_rate, word_length, frame_size):
+    def setupRouteScript(self, route_num, output_dir, sample_rate, word_length, frame_size):
         '''
         Setup route script from template
         '''
-        template = template_dir + self.route3_template
-        if not os.path.isfile(self.output_path + r'route\\' + self.route3_template):
-            tblog.infoLog("Could not find route template file!")
+        template = output_dir + self.route_template
+        if not os.path.isfile(template):
+            tblog.infoLog("Could not find route template file {0}!" .format(template))
             raise BellagioError("Could not find route template file!")
 
-        self.updateSwireSetting(sample_rate, word_length)
-        tblog.infoLog("route3 swire updated")
+        #set channel number based on different route
+        channel_num = 1
+        if route_num == 20:
+            channel_num = 2
+        self.updateSwireSetting(channel_num, sample_rate, word_length)
+        tblog.infoLog("SWIRE route updated")
 
         #when frame_size = 0.5ms, set shapiro 0x8035 = 0
         if frame_size < 1:
             frame_size = 0
 
         #gen route script name
-        route_script = self.output_path + r'route\\' + os.path.splitext(self.route3_script)[0] + '_' + str(sample_rate) + 'K_' + str(word_length) + 'bit_' + str(frame_size) + 'ms.xml'
+        route_script = output_dir + os.path.splitext(self.route_script)[0] + str(route_num) + '_' + str(sample_rate) + 'K_' + str(word_length) + 'bit_' + str(frame_size) + 'ms.xml'
 
         start_swire_setup = 0
         with open(template) as route_in, open(route_script, 'w') as route_out:
@@ -458,40 +468,70 @@ class LnkScriptMod(object):
                             tblog.infoLog("route3 swire updated: {0}" .format(line))
                             break;
                 else:
-                    line_updated = 1
+                    line_updated = 0
                     if re.search('_DATE_', line):
                         #update date
                         line = line.replace("_DATE_", datetime.datetime.now().strftime("%m/%d/%Y"))
-                    elif re.search('_INTERVAL_', line):
-                        #update sample interval in swire stream definition
-                        line = line.replace("_INTERVAL_", str(self.route3_rows * self.route3_cols))
-                    elif re.search('_FRAME_RATE_', line):
-                        #update frame rate in swire stream definition
+                        line_updated = 1
+                    if re.search('_INTERVAL_', line):
+                        #update sample_interval/channel_num/word_length in swire stream definition
+                        line = line.replace("_INTERVAL_", str(self.swire_rows * self.swire_cols))
+                        line = line.replace("_CHANNEL_NUM_", str(channel_num))
+                        line = line.replace("_WORDLENGTH_", str(word_length))
+                        line_updated = 1
+                    if re.search('_CHANNEL_ID_0_', line):
+                        #update frame_rate/channel_number in swire stream definition
                         line = line.replace("_FRAME_RATE_", str(sample_rate))
-                    elif re.search('_FRAME_SIZE_', line):
+                        line = line.replace("_CHANNEL_ID_0_", str(0))
+                        line_updated = 1
+                    if re.search('_CHANNEL_ID_1_', line):
+                        #update frame_rate/channel_number in swire stream definition
+                        if channel_num > 1:
+                            line = line.replace("_FRAME_RATE_", str(sample_rate))
+                            line = line.replace("_CHANNEL_ID_1_", str(1))
+                            line_updated = 1
+                        else:
+                            continue    #one channel route
+                    if re.search('_FRAME_SIZE_', line):
                         #update frame size for shapiro
                         line = line.replace("_FRAME_SIZE_", str(frame_size))
-                    elif re.search('_SAMPLE_RATE_', line):
+                        line_updated = 1
+                    if re.search('_SAMPLE_RATE_', line):
                         #update sample rate for shapiro
                         line = line.replace("_SAMPLE_RATE_", str(samplerate_reg_val[sample_rate]))
-                    elif re.search('_ROUTE_NUM_', line):
+                        line_updated = 1
+                    if re.search('_ROUTE_NUM_', line):
                         #update route number for shapiro
-                        line = line.replace("_ROUTE_NUM_", str(3))
-                    elif re.search('_DELAY_10MS_', line):
+                        line = line.replace("_ROUTE_NUM_", str(route_num))
+                        line_updated = 1
+                    if re.search('_DELAY_10MS_', line):
                         #update frames for delay
                         line = line.replace("_DELAY_10MS_", str(self.calTimeInFrames(10)))
-                    elif re.search('_STREAM_ROWS_', line) or re.search('_STREAM_COLS_', line) or re.search('_LOOP_FRAME_', line):
+                        line_updated = 1
+                    if re.search('_DELAY_2MS_', line):
+                        #update frames for delay
+                        line = line.replace("_DELAY_2MS_", str(self.calTimeInFrames(2)))
+                        line_updated = 1
+                    if re.search('_STREAM_ROWS_', line) or re.search('_STREAM_COLS_', line):
                         #update stream frame shape rows and cols
-                        line = line.replace("_STREAM_ROWS_", str(self.route3_rows))
-                        line = line.replace("_STREAM_COLS_", str(self.route3_cols))
+                        line = line.replace("_STREAM_ROWS_", str(self.swire_rows))
+                        line = line.replace("_STREAM_COLS_", str(self.swire_cols))
+                        line_updated = 1
+                    if re.search('_LOOP_FRAME_', line):
                         '''
                         update frame loop
                         FIXME: Should be LCM of frame_rate and 15(frames of dynamic sync period)
                                Here use frame_rate*15 temporarily
                         '''
-                        line = line.replace("_LOOP_FRAME_", str(self.route3_samplerate * 15))
-                    else:
-                        line_updated = 0
+                        line = line.replace("_LOOP_FRAME_", str(self.swire_samplerate * 15))
+                        line_updated = 1
+                    if re.search('_STREAM_CH_EN_', line):
+                        #update stream channel enable
+                        stream_ch_en = 1
+                        if channel_num > 1:
+                            stream_ch_en = 3
+                        line = line.replace("_STREAM_CH_EN_", str(stream_ch_en))
+                        line_updated = 1
 
                     if line_updated:
                         tblog.infoLog("route3 updated: {0}" .format(line))
@@ -505,11 +545,9 @@ class LnkScriptMod(object):
         '''
         Generate Shapiro swire route setup script for LnK
         '''
-        self.setupRouteScript(self.output_path + r'route\\', 24, 16, 2)
-        self.setupRouteScript(self.output_path + r'route\\', 32, 16, 2)
-        self.setupRouteScript(self.output_path + r'route\\', 48, 16, 2)
-        self.setupRouteScript(self.output_path + r'route\\', 96, 16, 2)
-        self.setupRouteScript(self.output_path + r'route\\', 192, 24, 1)
+        #self.setupRouteScript(3, self.output_path + r'route\\', 48, 16, 2)
+        self.setupRouteScript(3, self.output_path + r'route20\\', 48, 16, 2)
+        self.setupRouteScript(20, self.output_path + r'route20\\', 48, 24, 2)
 
 if __name__ == "__main__":
     tblog.setDebugMode(True)
