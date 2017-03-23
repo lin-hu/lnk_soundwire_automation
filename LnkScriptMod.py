@@ -16,18 +16,18 @@ import datetime
 from __builtin__ import classmethod
 
 swire_route_properties = {
-    '_DP_RX_'   : 03,
-    '_DP_TX_'   : 01,
-    '_DPRX_WORDLENGTH_'   : 23,
-    '_DPRX_INTERVAL_LO_'  : 0xff,
-    '_DPRX_INTERVAL_HI_'  : 0x01,
-    '_DPRX_BLOCK_OFFSET_' : 0x00,
-    '_DPRX_HCTRL_'        : 0x11,
-    '_DPTX_WORDLENGTH_'   : 23,
-    '_DPTX_INTERVAL_LO_'  : 0xff,
-    '_DPTX_INTERVAL_HI_'  : 0x01,
-    '_DPTX_BLOCK_OFFSET_' : 0x00,
-    '_DPTX_HCTRL_'        : 0x22,
+    '_DP_RX_'               : 03,
+    '_DP_TX_'               : 01,
+    '_DPRX_WORDLENGTH_'     : 23,
+    '_DPRX_INTERVAL_LO_'    : 0xff,
+    '_DPRX_INTERVAL_HI_'    : 0x01,
+    '_DPRX_BLOCK_OFFSET_'   : 0x00,
+    '_DPRX_HCTRL_'          : 0x11,
+    '_DPTX_WORDLENGTH_'     : 23,
+    '_DPTX_INTERVAL_LO_'    : 0xff,
+    '_DPTX_INTERVAL_HI_'    : 0x01,
+    '_DPTX_BLOCK_OFFSET_'   : 0x00,
+    '_DPTX_HCTRL_'          : 0x22,
     '_SCP_FRAMECTRL_'       : 0x08,
     '_CHANNEL_PREPARE_'     : 0x01,
     '_CHANNEL_EN_'          : 0x01}
@@ -43,8 +43,16 @@ swire_route_def = {
     3  : [1, 3, 1],
     11 : [1, 4, 1],
     13 : [1, 4, 2],
-    20 : [2, 3, 1]}
+    14 : [1, 3, 2],
+    20 : [2, 3, 1],
+    21 : [2, 4, 1],
+    24 : [3, 3, 1],
+    }
 
+shapiro_setup = {
+    0x8035  : 2,
+    0x8030  : 1,
+    0x8032  : 3}
 ###shapiro register(0x8030) value for different sample rate(KHz)
 samplerate_reg_val = {
     8   : 0,
@@ -220,6 +228,11 @@ class LnkScriptMod(object):
         if cp_content:
             self.cp_content_file = cp_content 
 
+    '''
+    ##############################################################
+       Gen swire DP download script
+    ##############################################################
+    '''
     def bin2Dat(self):
         '''
         convert config/fw binary file to LnK data port downloadable file
@@ -281,6 +294,11 @@ class LnkScriptMod(object):
 
         tblog.infoLog("LnkScriptMod: LnK script xml file revised!")
 
+    '''
+    ##############################################################
+       Gen swire CP download script
+    ##############################################################
+    '''
     def bin2CtrlPort(self, bin_file, cp_dl_script):
         '''
         convert config/fw binary file to LnK data control port script file
@@ -395,17 +413,97 @@ class LnkScriptMod(object):
             raise BellagioError("Could not find Bosko FW bin!")
         self.bin2CtrlPort(self.output_path+self.fw_file, self.output_path+self.cp_dl_fw_file)
 
+    '''
+    ##############################################################
+       Gen swire route setup script 
+    ##############################################################
+    '''
     def calTimeInFrames(self, delay_time):
         '''
         calculate how many frames we need for a period of time(ms)
         '''
         return delay_time * self.swire_samplerate
 
-    def updateSwireSetting(self, channel_num, samplerate):
+    def writeReadSwireReg(self, out_file, write, addr, val):
+        '''
+        generate script to write/read swire reg
+        '''
+        line_frame_start = r'<Swframe Repeat="1" rows="48" cols="2" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >' + '\n'
+        line_frame_end = r'</Swframe>' + '\n'
+        line_frame_wrrd = r'   <controlword opcode="_WR_RD_" DeviceAddress="1" RegisterAddress="_swire_reg_" Data="_swire_val_" />' + '\n'
+        line_frame = line_frame_wrrd
+        out_file.write(line_frame_start)
+        line_frame = line_frame.replace("_swire_reg_", ("0x{0:04x}" .format(addr)))
+        line_frame = line_frame.replace("_swire_val_", ("0x{0:02x}" .format(val&0xff)))
+        if write:
+            line_frame = line_frame.replace("_WR_RD_", str(3))
+        else:
+            line_frame = line_frame.replace("_WR_RD_", str(2))
+        out_file.write(line_frame)
+        out_file.write(line_frame_end)
+
+    def writeDelay(self, out_file, frame):
+        '''
+        generate script for delay
+        '''
+        line_delay = r'<Swframe Repeat="_DELAY_MS_" rows="48" cols="2" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >' + '\n' + r'   <controlword opcode="0" ssp="0" breq="0" brel="0" reserved="0" />' + '\n' + '</Swframe>\n'
+        line_delay = line_delay.replace("_DELAY_MS_", str(frame))
+        out_file.write(line_delay)
+
+    def writeShapiroReg(self, out_file, addr, val):
+        '''
+        generate script to write Shapiro reg through swire
+        '''
+        line_comment = '<!-- Shapiro write reg 0x{0:X} = 0x{1:04x} -->\n' .format(addr, val)
+
+        out_file.write(line_comment)
+
+        write = 1
+        swire_reg = 0x2000
+        self.writeReadSwireReg(out_file, write, swire_reg, val&0xff)
+
+        swire_reg += 1  #0x2001
+        self.writeReadSwireReg(out_file, write, swire_reg, (val>>8)&0xff)
+
+        swire_reg += 1  #0x2002
+        self.writeReadSwireReg(out_file, write, swire_reg, addr&0xff)
+
+        swire_reg += 1  #0x2003
+        self.writeReadSwireReg(out_file, write, swire_reg, (addr>>8)&0xff)
+
+        ###Add 10ms delay between shapiro write/read
+        self.writeDelay(out_file, self.calTimeInFrames(10))
+
+        write = 0
+        swire_reg += 1
+        self.writeReadSwireReg(out_file, write, swire_reg, 0)
+
+        swire_reg += 1
+        self.writeReadSwireReg(out_file, write, swire_reg, 0)
+
+        swire_reg += 1
+        self.writeReadSwireReg(out_file, write, swire_reg, 0)
+
+        swire_reg += 1
+        self.writeReadSwireReg(out_file, write, swire_reg, 0)
+
+        ###Add 10ms delay between shapiro write/read
+        self.writeDelay(out_file, self.calTimeInFrames(10))
+
+    def updateShapiroRouteSetting(self, out_file, route_num):
+        '''
+        update shapiro setting for different route
+        '''
+        tblog.infoLog("Shapiro SWIRE route {0} setup" .format(route_num))
+        self.writeShapiroReg(out_file, 0x8035, shapiro_setup[0x8035])
+        self.writeShapiroReg(out_file, 0x8030, shapiro_setup[0x8030])
+        self.writeShapiroReg(out_file, 0x8032, shapiro_setup[0x8032])
+
+    def updateSwireSetting(self):
         '''
         update swire related settings according to current audio
         '''
-        tblog.infoLog("swire route update: chan {0} samplerate {1}" .format(channel_num, samplerate))
+        tblog.infoLog("swire route update: chan {0} samplerate {1}" .format(self.channel_num, self.swire_samplerate))
 
         if self.tx_samplerate == 192:
             '''
@@ -417,8 +515,8 @@ class LnkScriptMod(object):
             tblog.infoLog("route3 192K frame: {0}" .format(frame_shape_lut[192]))
 
 
-        self.swire_rows = frame_shape_lut[samplerate][frame_shape_index['row']]
-        self.swire_cols = frame_shape_lut[samplerate][frame_shape_index['col']]
+        self.swire_rows = frame_shape_lut[self.swire_samplerate][frame_shape_index['row']]
+        self.swire_cols = frame_shape_lut[self.swire_samplerate][frame_shape_index['col']]
 
         #for SCP_FrameCtrl register
         rows_ctrl = swire_rows_ctrl[self.swire_rows]
@@ -429,16 +527,16 @@ class LnkScriptMod(object):
         swire_route_properties['_DPRX_WORDLENGTH_'] = self.rx_wordlength
         swire_route_properties['_DPRX_INTERVAL_LO_'] = rx_sample_interval & 0xff
         swire_route_properties['_DPRX_INTERVAL_HI_'] = (rx_sample_interval >> 8) & 0xff
-        swire_route_properties['_DPRX_BLOCK_OFFSET_'] = frame_shape_lut[samplerate][frame_shape_index['dp_rx_offset']]
-        swire_route_properties['_DPRX_HCTRL_'] = (frame_shape_lut[samplerate][frame_shape_index['dp_rx_hstart']] << 4) + (frame_shape_lut[samplerate][frame_shape_index['dp_rx_hstop']] & 0xf)
+        swire_route_properties['_DPRX_BLOCK_OFFSET_'] = frame_shape_lut[self.swire_samplerate][frame_shape_index['dp_rx_offset']]
+        swire_route_properties['_DPRX_HCTRL_'] = (frame_shape_lut[self.swire_samplerate][frame_shape_index['dp_rx_hstart']] << 4) + (frame_shape_lut[self.swire_samplerate][frame_shape_index['dp_rx_hstop']] & 0xf)
 
         tx_sample_interval = (self.swire_bitrate/self.tx_samplerate) - 1
         swire_route_properties['_DP_TX_'] = self.dp_tx
         swire_route_properties['_DPTX_WORDLENGTH_'] = self.tx_wordlength
         swire_route_properties['_DPTX_INTERVAL_LO_'] = tx_sample_interval & 0xff
         swire_route_properties['_DPTX_INTERVAL_HI_'] = (tx_sample_interval >> 8) & 0xff
-        swire_route_properties['_DPTX_BLOCK_OFFSET_'] = frame_shape_lut[samplerate][frame_shape_index['dp_tx_offset']]
-        swire_route_properties['_DPTX_HCTRL_'] = (frame_shape_lut[samplerate][frame_shape_index['dp_tx_hstart']] << 4) + (frame_shape_lut[samplerate][frame_shape_index['dp_tx_hstop']] & 0xf)
+        swire_route_properties['_DPTX_BLOCK_OFFSET_'] = frame_shape_lut[self.swire_samplerate][frame_shape_index['dp_tx_offset']]
+        swire_route_properties['_DPTX_HCTRL_'] = (frame_shape_lut[self.swire_samplerate][frame_shape_index['dp_tx_hstart']] << 4) + (frame_shape_lut[self.swire_samplerate][frame_shape_index['dp_tx_hstop']] & 0xf)
 
         swire_route_properties['_SCP_FRAMECTRL_'] = (rows_ctrl << 3) + cols_ctrl
         tblog.infoLog("route3 swire frame control: 0x{0:02x}" .format(swire_route_properties['_SCP_FRAMECTRL_']))
@@ -446,7 +544,7 @@ class LnkScriptMod(object):
         update multiple channel setting
         FIXME: currently only support 2-ch
         '''
-        if channel_num == 2:
+        if self.channel_num == 2:
             swire_route_properties['_CHANNEL_PREPARE_'] = 3
             swire_route_properties['_CHANNEL_EN_'] = 3
             tblog.infoLog("route channel control: 0x{0:02x}" .format(swire_route_properties['_CHANNEL_EN_']))
@@ -471,7 +569,7 @@ class LnkScriptMod(object):
         self.tx_wordlength = tx_wordlength - 1    #number: length - 1
 
         '''
-        Form frame shape from PCM stream first!
+        Form frame shape based on PCM stream sample rate
             if rx is PCM, use rx
             else if tx is PCM, use tx 
         FIXME: will handle PDM pass through later!!!
@@ -488,7 +586,7 @@ class LnkScriptMod(object):
 
         tblog.infoLog("Route{0} def: channel {1}, RX port {2} TX port {3}!" .format(route_num, self.channel_num, self.dp_rx, self.dp_tx))
 
-        self.updateSwireSetting(self.channel_num, self.swire_samplerate)
+        self.updateSwireSetting()
         tblog.infoLog("SWIRE route updated")
 
         #gen route script name
@@ -502,7 +600,19 @@ class LnkScriptMod(object):
         with open(template) as route_in, open(route_script, 'w') as route_out:
             for line in route_in:
                 '''
-                update swire channel setup
+                fill the content for shaprio setup
+                '''
+                if re.search('start shapiro setup', line):
+                    route_out.write(line)
+                    shapiro_setup[0x8030] = samplerate_reg_val[self.swire_samplerate]
+                    shapiro_setup[0x8032] = route_num
+                    shapiro_setup[0x8035] = frame_size
+
+                    self.updateShapiroRouteSetting(route_out, route_num)
+                    continue
+
+                '''
+                update swire setup
                 '''
                 if re.search('start swire channel setup', line):
                     start_swire_setup = 1
@@ -514,7 +624,7 @@ class LnkScriptMod(object):
                     for (k, v) in swire_route_properties.items():
                         if re.search(k, line):
                             line = line.replace(k, ("0x{0:02X}" .format(v)))
-                            continue;
+                            continue
                 else:
                     line_updated = 0
                     if re.search('_DATE_', line):
@@ -561,21 +671,6 @@ class LnkScriptMod(object):
                         if self.channel_num > 1:
                             stream_ch_en = 3
                         line = line.replace("_STREAM_CH_EN_", str(stream_ch_en))
-                        line_updated = 1
-                    '''
-                    update shapiro setup
-                    '''
-                    if re.search('_FRAME_SIZE_', line):
-                        #update frame size for shapiro
-                        line = line.replace("_FRAME_SIZE_", str(frame_size))
-                        line_updated = 1
-                    if re.search('_SAMPLE_RATE_', line):
-                        #update sample rate for shapiro
-                        line = line.replace("_SAMPLE_RATE_", str(samplerate_reg_val[self.swire_samplerate]))
-                        line_updated = 1
-                    if re.search('_ROUTE_NUM_', line):
-                        #update route number for shapiro
-                        line = line.replace("_ROUTE_NUM_", str(route_num))
                         line_updated = 1
                     '''
                     update swire route setup
@@ -625,7 +720,7 @@ class LnkScriptMod(object):
         self.setupRouteScript(3, self.output_path + r'route11\\', 48, 16, 48, 16, 2)
         self.setupRouteScript(20, self.output_path + r'route11\\', 48, 24, 48, 24, 2)
         '''
-        self.setupRouteScript(11, self.output_path + r'route11\\', 768, 1, 48, 24, 2)
+        #self.setupRouteScript(11, self.output_path + r'route11\\', 768, 1, 48, 24, 2)
         self.setupRouteScript(13, self.output_path + r'route11\\', 768, 1, 768, 1, 8)
 
 if __name__ == "__main__":
