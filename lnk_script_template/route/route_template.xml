@@ -91,14 +91,14 @@
          SFrameStartChar="-" 
          timedc="8000" />
  
-<!-- LHDEBUG Route automation: start stream -->
+<!-- LHDEBUG Route automation: start stream define -->
    <!-- Stream A1 -->
    <DataStream Id="A1">
       <Structure Channels="_CHANNEL_NUM_" Interval="_INTERVAL_" Hstart="1" Hstop="1" Offset="0" Length="_WORDLENGTH_" Protocol="0" BlockPackingMode="0" BlockGroupCount="1" SubOffset="0" Lane="0" />
       <Content ChID="_CHANNEL_ID_0_" Wave="_INPUT_WAVEFORM_" Freq="1000" N="_FRAME_RATE_" M="1" Amplitude="-_AMP_dBFs" />
       <Content ChID="_CHANNEL_ID_1_" Wave="_INPUT_WAVEFORM_" Freq="1000" N="_FRAME_RATE_" M="1" Amplitude="-_AMP_dBFs" />
    </DataStream>
-<!-- LHDEBUG Route automation: end stream -->
+<!-- LHDEBUG Route automation: end stream define -->
  
 </Init>
  
@@ -169,295 +169,17 @@
    <controlword opcode="0" ssp="0" breq="0" brel="0" reserved="0" />
 </Swframe>
  
-<!-- LHDEBUG: Route automation: start shapiro setup -->
+<!-- Route automation: start shapiro setup -->
 
-<!-- LHDEBUG: Route automation: end shapiro setup -->
+<!-- Route automation: end shapiro setup -->
 
-<!-- LHDEBUG: Route automation: start swire channel setup -->
+<!-- Route automation: start swire channel setup -->
+ 
+<!-- Route automation: end swire channel setup -->
 
-<!-- Event #88 : Frame Start -->
-<Swframe Repeat="180" rows="48" cols="2" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >
-   <!-- Event #89 : PING -->
-   <controlword opcode="0" ssp="0" breq="0" brel="0" reserved="0" />
-   <Comment="Begin Macro PREPARE CHANNELS(DA=1, DP=3, Ch1=1, Ch2=1, Ch3=0, Ch4=0, Ch5=0, Ch6=0, Ch7=0, Ch8=0)"/>
-</Swframe>
- 
-<!-- Event #91 : Frame Start -->
-<Swframe Repeat="1" rows="48" cols="2" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >
-   <!-- Event #92 : WRITE -->
-   <controlword opcode="3" DeviceAddress="1" RegisterAddress="_DP_RX_05" Data="_CHANNEL_PREPARE_" />
-   <Comment="End of Macro PREPARE CHANNELS"/>
-   <Comment="Begin Macro CONFIGURE CHANNELS(DA=1, DP=3, BSEL=1, Ch1=1, Ch2=1, Ch3=0, Ch4=0, Ch5=0, Ch6=0, Ch7=0, Ch8=0)"/>
-</Swframe>
- 
-<!-- Event #95 : Frame Start -->
-<Swframe Repeat="1" rows="48" cols="2" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >
-   <!-- Event #96 : WRITE -->
-   <controlword opcode="3" DeviceAddress="1" RegisterAddress="_DP_RX_30" Data="_CHANNEL_EN_" />
-   <Comment="End of Macro CONFIGURE CHANNELS"/>
-   <Comment="Begin Macro CONFIGURE DATA PORT(DA=1, DP=3, BSEL=1, L=0, S=A0, INV=0, MODE=0)"/>
-</Swframe>
- 
-<!-- Event #99 : Frame Start -->
-<Swframe Repeat="1" rows="48" cols="2" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >
-   <!-- Event #100 : WRITE -->
-   <controlword opcode="3" DeviceAddress="1" RegisterAddress="_DP_RX_02" Data="0x00" />
-</Swframe>
- 
-<!-- Event #101 : Frame Start -->
-<Swframe Repeat="1" rows="48" cols="2" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >
-   <!-- Event #102 : WRITE -->
-   <controlword opcode="3" DeviceAddress="1" RegisterAddress="_DP_RX_03" Data="_DPRX_WORDLENGTH_" />
-</Swframe>
- 
-<!-- Event #103 : Frame Start -->
-<Swframe Repeat="1" rows="48" cols="2" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >
-   <!-- Event #104 : WRITE -->
-   <controlword opcode="3" DeviceAddress="1" RegisterAddress="_DP_RX_31" Data="0x00" />
-</Swframe>
- 
-<!-- Event #105 : Frame Start -->
-<Swframe Repeat="1" rows="48" cols="2" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >
-   <!-- Event #106 : WRITE -->
-   <controlword opcode="3" DeviceAddress="1" RegisterAddress="_DP_RX_32" Data="_DPRX_INTERVAL_LO_" />
-</Swframe>
- 
-<!-- Event #107 : Frame Start -->
-<Swframe Repeat="1" rows="48" cols="2" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >
-   <!-- Event #108 : WRITE -->
-   <controlword opcode="3" DeviceAddress="1" RegisterAddress="_DP_RX_33" Data="_DPRX_INTERVAL_HI_" />
-</Swframe>
- 
-<!-- Event #109 : Frame Start -->
-<Swframe Repeat="1" rows="48" cols="2" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >
-   <!-- Event #110 : WRITE -->
-   <controlword opcode="3" DeviceAddress="1" RegisterAddress="_DP_RX_34" Data="_DPRX_BLOCK_OFFSET_" />
-</Swframe>
- 
-<!-- Event #111 : Frame Start -->
-<Swframe Repeat="1" rows="48" cols="2" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >
-   <!-- Event #112 : WRITE -->
-   <controlword opcode="3" DeviceAddress="1" RegisterAddress="_DP_RX_35" Data="0x00" />
-</Swframe>
- 
-<!-- Event #113 : Frame Start -->
-<Swframe Repeat="1" rows="48" cols="2" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >
-   <!-- Event #114 : WRITE -->
-   <controlword opcode="3" DeviceAddress="1" RegisterAddress="_DP_RX_36" Data="_DPRX_HCTRL_" />
-</Swframe>
- 
-<!-- Event #115 : Frame Start -->
-<Swframe Repeat="1" rows="48" cols="2" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >
-   <!-- Event #116 : WRITE -->
-   <controlword opcode="3" DeviceAddress="1" RegisterAddress="_DP_RX_37" Data="0x00" />
-</Swframe>
- 
-<!-- Event #117 : Frame Start -->
-<Swframe Repeat="1" rows="48" cols="2" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >
-   <!-- Event #118 : WRITE -->
-   <controlword opcode="3" DeviceAddress="1" RegisterAddress="_DP_RX_38" Data="0x00" />
-   <Comment="End of Macro CONFIGURE DATA PORT"/>
-   <Comment="Begin Macro PREPARE CHANNELS(DA=1, DP=1, Ch1=1, Ch2=1, Ch3=0, Ch4=0, Ch5=0, Ch6=0, Ch7=0, Ch8=0)"/>
-</Swframe>
- 
-<!-- Event #121 : Frame Start -->
-<Swframe Repeat="1" rows="48" cols="2" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >
-   <!-- Event #122 : WRITE -->
-   <controlword opcode="3" DeviceAddress="1" RegisterAddress="_DP_TX_05" Data="_CHANNEL_PREPARE_" />
-   <Comment="End of Macro PREPARE CHANNELS"/>
-   <Comment="Begin Macro CONFIGURE CHANNELS(DA=1, DP=1, BSEL=1, Ch1=1, Ch2=1, Ch3=0, Ch4=0, Ch5=0, Ch6=0, Ch7=0, Ch8=0)"/>
-</Swframe>
- 
-<!-- Event #125 : Frame Start -->
-<Swframe Repeat="1" rows="48" cols="2" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >
-   <!-- Event #126 : WRITE -->
-   <controlword opcode="3" DeviceAddress="1" RegisterAddress="_DP_TX_30" Data="_CHANNEL_EN_" />
-   <Comment="End of Macro CONFIGURE CHANNELS"/>
-   <Comment="Begin Macro CONFIGURE DATA PORT(DA=1, DP=1, BSEL=1, L=0, S=A1, INV=0, MODE=0)"/>
-</Swframe>
- 
-<!-- Event #129 : Frame Start -->
-<Swframe Repeat="1" rows="48" cols="2" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >
-   <!-- Event #130 : WRITE -->
-   <controlword opcode="3" DeviceAddress="1" RegisterAddress="_DP_TX_02" Data="0x00" />
-</Swframe>
- 
-<!-- Event #131 : Frame Start -->
-<Swframe Repeat="1" rows="48" cols="2" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >
-   <!-- Event #132 : WRITE -->
-   <controlword opcode="3" DeviceAddress="1" RegisterAddress="_DP_TX_03" Data="_DPTX_WORDLENGTH_" />
-</Swframe>
- 
-<!-- Event #133 : Frame Start -->
-<Swframe Repeat="1" rows="48" cols="2" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >
-   <!-- Event #134 : WRITE -->
-   <controlword opcode="3" DeviceAddress="1" RegisterAddress="_DP_TX_31" Data="0x00" />
-</Swframe>
- 
-<!-- Event #135 : Frame Start -->
-<Swframe Repeat="1" rows="48" cols="2" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >
-   <!-- Event #136 : WRITE -->
-   <controlword opcode="3" DeviceAddress="1" RegisterAddress="_DP_TX_32" Data="_DPTX_INTERVAL_LO_" />
-</Swframe>
- 
-<!-- Event #137 : Frame Start -->
-<Swframe Repeat="1" rows="48" cols="2" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >
-   <!-- Event #138 : WRITE -->
-   <controlword opcode="3" DeviceAddress="1" RegisterAddress="_DP_TX_33" Data="_DPTX_INTERVAL_HI_" />
-</Swframe>
- 
-<!-- Event #139 : Frame Start -->
-<Swframe Repeat="1" rows="48" cols="2" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >
-   <!-- Event #140 : WRITE -->
-   <controlword opcode="3" DeviceAddress="1" RegisterAddress="_DP_TX_34" Data="_DPTX_BLOCK_OFFSET_" />
-</Swframe>
- 
-<!-- Event #141 : Frame Start -->
-<Swframe Repeat="1" rows="48" cols="2" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >
-   <!-- Event #142 : WRITE -->
-   <controlword opcode="3" DeviceAddress="1" RegisterAddress="_DP_TX_35" Data="0x00" />
-</Swframe>
- 
-<!-- Event #143 : Frame Start -->
-<Swframe Repeat="1" rows="48" cols="2" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >
-   <!-- Event #144 : WRITE -->
-   <controlword opcode="3" DeviceAddress="1" RegisterAddress="_DP_TX_36" Data="_DPTX_HCTRL_" />
-</Swframe>
- 
-<!-- Event #145 : Frame Start -->
-<Swframe Repeat="1" rows="48" cols="2" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >
-   <!-- Event #146 : WRITE -->
-   <controlword opcode="3" DeviceAddress="1" RegisterAddress="_DP_TX_37" Data="0x00" />
-</Swframe>
- 
-<!-- Event #147 : Frame Start -->
-<Swframe Repeat="1" rows="48" cols="2" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >
-   <!-- Event #148 : WRITE -->
-   <controlword opcode="3" DeviceAddress="1" RegisterAddress="_DP_TX_38" Data="0x00" />
-   <Comment="End of Macro CONFIGURE DATA PORT"/>
-</Swframe>
- 
-<!-- Event #150 : Frame Start -->
-<Swframe Repeat="7" rows="48" cols="2" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >
-   <!-- Event #151 : PING -->
-   <controlword opcode="0" ssp="0" breq="0" brel="0" reserved="0" />
-   <Comment=""/>
-</Swframe>
+<!-- Route automation: start data stream -->
 
-<!-- LHDEBUG: Route automation: start data stream frame shape setup -->
-
-<!-- Event #153 : Frame Start -->
-<Swframe Repeat="15" rows="48" cols="2" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >
-   <!-- Event #154 : PING -->
-   <controlword opcode="0" ssp="0" breq="0" brel="0" reserved="0" />
-   <Comment="Begin Macro SET FRAME SHAPE(DA=15, BSEL=1, ROW=0, COL=0, P=0)"/>
-</Swframe>
- 
-<!-- Event #156 : Frame Start -->
-<Swframe Repeat="1" rows="48" cols="2" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >
-   <!-- Event #157 : WRITE -->
-   <controlword opcode="3" DeviceAddress="15" RegisterAddress="0x0070" Data="_SCP_FRAMECTRL_" />
-   <Comment="End of Macro SET FRAME SHAPE"/>
-</Swframe>
- 
-<!-- LHDEBUG: Route automation: end data stream frame shape setup -->
-
-<!-- LHDEBUG: Route automation: end swire channel setup -->
-
-<!-- LHDEBUG: Route automation: data stream start -->
-
-<!-- Event #160 : Frame Start -->
-<Swframe Repeat="1" rows="_STREAM_ROWS_" cols="_STREAM_COLS_" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >
-   <!-- Event #161 : Start Stream -->
-   <DataStream Id="A1" >
-      <Start ChannelEnable="_STREAM_CH_EN_" />
-   </DataStream>
-   <!-- Event #162 : PING -->
-   <controlword opcode="0" ssp="0" breq="0" brel="0" reserved="0" />
-</Swframe>
- 
-<!-- Event #163 : Frame Start -->
-<Swframe Repeat="13" rows="_STREAM_ROWS_" cols="_STREAM_COLS_" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >
-   <!-- Event #164 : PING -->
-   <controlword opcode="0" ssp="0" breq="0" brel="0" reserved="0" />
-</Swframe>
- 
- 
-<!-- Event #165 : Loop Begin -->
-<Loop Repeat="100" >
- 
-<!-- Event #166 : Frame Start -->
-<Swframe Repeat="_LOOP_FRAME_" rows="_STREAM_ROWS_" cols="_STREAM_COLS_" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >
-   <!-- Event #167 : PING -->
-   <controlword opcode="0" ssp="1" breq="0" brel="0" reserved="0" />
-</Swframe>
- 
-<!-- Event #168 : Loop End -->
-</Loop>
-
-<!-- LHDEBUG: Route automation: data stream end -->
-
-<Swframe Repeat="1" rows="_STREAM_ROWS_" cols="_STREAM_COLS_" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >
-   <controlword opcode="3" DeviceAddress="1" RegisterAddress="_DP_RX_30" Data="0x00" />
-</Swframe>
-
-<Swframe Repeat="1" rows="_STREAM_ROWS_" cols="_STREAM_COLS_" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >
-   <controlword opcode="3" DeviceAddress="1" RegisterAddress="_DP_TX_30" Data="0x00" />
-</Swframe>
- 
-<Swframe Repeat="1" rows="_STREAM_ROWS_" cols="_STREAM_COLS_" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >
-   <controlword opcode="0" ssp="1" breq="0" brel="0" reserved="0" />
-   <Comment="Wait 2 ms  close Route"/>
-</Swframe>
- 
-<Swframe Repeat="_DELAY_2MS_" rows="_STREAM_ROWS_" cols="_STREAM_COLS_" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >
-   <controlword opcode="0" ssp="1" breq="0" brel="0" reserved="0" />
-</Swframe>
- 
-<Swframe Repeat="1" rows="_STREAM_ROWS_" cols="_STREAM_COLS_" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >
-   <controlword opcode="3" DeviceAddress="1" RegisterAddress="0x2000" Data="0x00" />
-</Swframe>
- 
-<Swframe Repeat="1" rows="_STREAM_ROWS_" cols="_STREAM_COLS_" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >
-   <controlword opcode="3" DeviceAddress="1" RegisterAddress="0x2001" Data="0x00" />
-</Swframe>
- 
-<Swframe Repeat="1" rows="_STREAM_ROWS_" cols="_STREAM_COLS_" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >
-   <controlword opcode="3" DeviceAddress="1" RegisterAddress="0x2002" Data="0x33" />
-</Swframe>
- 
-<Swframe Repeat="1" rows="_STREAM_ROWS_" cols="_STREAM_COLS_" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >
-   <controlword opcode="3" DeviceAddress="1" RegisterAddress="0x2003" Data="0x80" />
-   <Comment="Delay of about 10 ms."/>
-</Swframe>
- 
-<Swframe Repeat="_DELAY_10MS_" rows="_STREAM_ROWS_" cols="_STREAM_COLS_" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >
-   <controlword opcode="0" ssp="1" breq="0" brel="0" reserved="0" />
-</Swframe>
- 
-<Swframe Repeat="1" rows="_STREAM_ROWS_" cols="_STREAM_COLS_" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >
-   <controlword opcode="2" DeviceAddress="1" RegisterAddress="0x2004" Data="0x00" />
-</Swframe>
- 
-<Swframe Repeat="1" rows="_STREAM_ROWS_" cols="_STREAM_COLS_" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >
-   <controlword opcode="2" DeviceAddress="1" RegisterAddress="0x2005" Data="0x00" />
-</Swframe>
- 
-<Swframe Repeat="1" rows="_STREAM_ROWS_" cols="_STREAM_COLS_" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >
-   <controlword opcode="2" DeviceAddress="1" RegisterAddress="0x2006" Data="0x00" />
-</Swframe>
- 
-<Swframe Repeat="1" rows="_STREAM_ROWS_" cols="_STREAM_COLS_" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >
-   <controlword opcode="2" DeviceAddress="1" RegisterAddress="0x2007" Data="0x00" />
-</Swframe>
- 
-<Swframe Repeat="10" rows="_STREAM_ROWS_" cols="_STREAM_COLS_" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >
-   <controlword opcode="0" ssp="1" breq="0" brel="0" reserved="0" />
-</Swframe>
- 
-<Swframe Repeat="1" rows="_STREAM_ROWS_" cols="_STREAM_COLS_" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >
-   <controlword opcode="0" ssp="1" breq="0" brel="0" reserved="0" />
-</Swframe>
+<!-- Route automation: end data stream -->
  
 <Command>
 </Command>

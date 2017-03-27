@@ -15,30 +15,39 @@ import re
 import datetime
 from __builtin__ import classmethod
 
+#index of list
+swire_reg_addr = 0
+swire_reg_val  = 1
+swire_reg_seq  = 2
+#swire route setup register LUT
 swire_route_properties = {
-    '_DP_RX_'               : 03,
-    '_DP_TX_'               : 01,
-    '_DPRX_WORDLENGTH_'     : 23,
-    '_DPRX_INTERVAL_LO_'    : 0xff,
-    '_DPRX_INTERVAL_HI_'    : 0x01,
-    '_DPRX_BLOCK_OFFSET_'   : 0x00,
-    '_DPRX_HCTRL_'          : 0x11,
-    '_DPTX_WORDLENGTH_'     : 23,
-    '_DPTX_INTERVAL_LO_'    : 0xff,
-    '_DPTX_INTERVAL_HI_'    : 0x01,
-    '_DPTX_BLOCK_OFFSET_'   : 0x00,
-    '_DPTX_HCTRL_'          : 0x22,
-    '_SCP_FRAMECTRL_'       : 0x08,
-    '_CHANNEL_PREPARE_'     : 0x01,
-    '_CHANNEL_EN_'          : 0x01}
+    '_DPRX_CHANNEL_PREPARE_'    : [0x05, 0x01, 0],
+    '_DPRX_CHANNEL_EN_'         : [0x30, 0x01, 1],
+    '_DPRX_PORTCTRL_'           : [0x02, 0, 2],
+    '_DPRX_WORDLENGTH_'         : [0x03, 23, 3],
+    '_DPRX_INTERVAL_LO_'        : [0x32, 0xff, 4],
+    '_DPRX_INTERVAL_HI_'        : [0x33, 0x01, 5],
+    '_DPRX_BLOCK_OFFSET_'       : [0x34, 0x00, 6],
+    '_DPRX_HCTRL_'              : [0x36, 0x11, 7],
+    '_DPTX_CHANNEL_PREPARE_'    : [0x05, 0x01, 8],
+    '_DPTX_CHANNEL_EN_'         : [0x30, 0x01, 9],
+    '_DPTX_PORTCTRL_'           : [0x02, 0, 10],
+    '_DPTX_WORDLENGTH_'         : [0x03, 23, 11],
+    '_DPTX_INTERVAL_LO_'        : [0x32, 0xff, 12],
+    '_DPTX_INTERVAL_HI_'        : [0x33, 0x01, 13],
+    '_DPTX_BLOCK_OFFSET_'       : [0x34, 0x00, 14],
+    '_DPTX_HCTRL_'              : [0x36, 0x22, 15],
+        }
 
 '''
-soundwire route def {route# : [channel#, rx_port, tx_port]}
+shapiro soundwire route def {route# : [channel#, rx_port, tx_port]}
 '''
 swire_route_def_index = {
     'channel_num'   : 0,
     'rx_port'       : 1,
-    'tx_port'       : 2}
+    'tx_port'       : 2,
+    }
+
 swire_route_def = {
     3  : [1, 3, 1],
     11 : [1, 4, 1],
@@ -49,11 +58,7 @@ swire_route_def = {
     24 : [3, 3, 1],
     }
 
-shapiro_setup = {
-    0x8035  : 2,
-    0x8030  : 1,
-    0x8032  : 3}
-###shapiro register(0x8030) value for different sample rate(KHz)
+#shapiro samplerate(KHz) register(0x8030) value LUT
 samplerate_reg_val = {
     8   : 0,
     16  : 1,
@@ -61,7 +66,8 @@ samplerate_reg_val = {
     32  : 3,
     48  : 4,
     96  : 5,
-    192 : 6 }
+    192 : 6,
+    }
 
 '''
 LUT of swire frame shape for different sample rate data stream
@@ -424,33 +430,43 @@ class LnkScriptMod(object):
         '''
         return delay_time * self.swire_samplerate
 
-    def writeReadSwireReg(self, out_file, write, addr, val):
+    def genSwirePing(self, out_file, delay=1, ssp=0, rows=48, cols=2):
+        '''
+        Generate SWIRE Ping script
+        delay: "ping" is also used for delay: use "calTimeInFrames" to calculate how many frames a delay needs
+        ssp: usually "ssp" only needs to be enabled in data stream transfer portion
+        '''
+        line_ping = r'<Swframe Repeat="_DELAY_" rows="_ROWS_" cols="_COLS_" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >' + '\n' + r'   <controlword opcode="0" ssp="_SSP_" breq="0" brel="0" reserved="0" />' + '\n' + '</Swframe>\n'
+        line_ping = line_ping.replace("_DELAY_", str(delay))
+        line_ping = line_ping.replace("_SSP_", str(ssp))
+        line_ping = line_ping.replace("_ROWS_", str(rows))
+        line_ping = line_ping.replace("_COLS_", str(cols))
+        out_file.write(line_ping)
+
+    def writeReadSwireReg(self, out_file, write, addr, val, dev=1, rows=48, cols=2):
         '''
         generate script to write/read swire reg
         '''
-        line_frame_start = r'<Swframe Repeat="1" rows="48" cols="2" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >' + '\n'
+        line_frame_start = r'<Swframe Repeat="1" rows="_ROWS_" cols="_COLS_" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >' + '\n'
         line_frame_end = r'</Swframe>' + '\n'
-        line_frame_wrrd = r'   <controlword opcode="_WR_RD_" DeviceAddress="1" RegisterAddress="_swire_reg_" Data="_swire_val_" />' + '\n'
-        line_frame = line_frame_wrrd
+        line_frame = r'   <controlword opcode="_WR_RD_" DeviceAddress="_DEV_" RegisterAddress="_swire_reg_" Data="_swire_val_" />' + '\n'
+
+        line_frame_start = line_frame_start.replace("_ROWS_", str(rows))
+        line_frame_start = line_frame_start.replace("_COLS_", str(cols))
         out_file.write(line_frame_start)
+
         line_frame = line_frame.replace("_swire_reg_", ("0x{0:04x}" .format(addr)))
         line_frame = line_frame.replace("_swire_val_", ("0x{0:02x}" .format(val&0xff)))
+        line_frame = line_frame.replace("_DEV_", str(dev))
         if write:
             line_frame = line_frame.replace("_WR_RD_", str(3))
-        else:
+        else:   #read
             line_frame = line_frame.replace("_WR_RD_", str(2))
         out_file.write(line_frame)
+
         out_file.write(line_frame_end)
 
-    def writeDelay(self, out_file, frame):
-        '''
-        generate script for delay
-        '''
-        line_delay = r'<Swframe Repeat="_DELAY_MS_" rows="48" cols="2" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >' + '\n' + r'   <controlword opcode="0" ssp="0" breq="0" brel="0" reserved="0" />' + '\n' + '</Swframe>\n'
-        line_delay = line_delay.replace("_DELAY_MS_", str(frame))
-        out_file.write(line_delay)
-
-    def writeShapiroReg(self, out_file, addr, val):
+    def writeShapiroReg(self, out_file, addr, val, dev=1, rows=48, cols=2):
         '''
         generate script to write Shapiro reg through swire
         '''
@@ -460,44 +476,98 @@ class LnkScriptMod(object):
 
         write = 1
         swire_reg = 0x2000
-        self.writeReadSwireReg(out_file, write, swire_reg, val&0xff)
+        self.writeReadSwireReg(out_file, write, swire_reg, val&0xff, dev, rows, cols)
 
         swire_reg += 1  #0x2001
-        self.writeReadSwireReg(out_file, write, swire_reg, (val>>8)&0xff)
+        self.writeReadSwireReg(out_file, write, swire_reg, (val>>8)&0xff, dev, rows, cols)
 
         swire_reg += 1  #0x2002
-        self.writeReadSwireReg(out_file, write, swire_reg, addr&0xff)
+        self.writeReadSwireReg(out_file, write, swire_reg, addr&0xff, dev, rows, cols)
 
         swire_reg += 1  #0x2003
-        self.writeReadSwireReg(out_file, write, swire_reg, (addr>>8)&0xff)
+        self.writeReadSwireReg(out_file, write, swire_reg, (addr>>8)&0xff, dev, rows, cols)
 
         ###Add 10ms delay between shapiro write/read
-        self.writeDelay(out_file, self.calTimeInFrames(10))
+        self.genSwirePing(out_file, self.calTimeInFrames(10), 0, rows, cols)
 
         write = 0
         swire_reg += 1
-        self.writeReadSwireReg(out_file, write, swire_reg, 0)
+        self.writeReadSwireReg(out_file, write, swire_reg, 0, dev, rows, cols)
 
         swire_reg += 1
-        self.writeReadSwireReg(out_file, write, swire_reg, 0)
+        self.writeReadSwireReg(out_file, write, swire_reg, 0, dev, rows, cols)
 
         swire_reg += 1
-        self.writeReadSwireReg(out_file, write, swire_reg, 0)
+        self.writeReadSwireReg(out_file, write, swire_reg, 0, dev, rows, cols)
 
         swire_reg += 1
-        self.writeReadSwireReg(out_file, write, swire_reg, 0)
+        self.writeReadSwireReg(out_file, write, swire_reg, 0, dev, rows, cols)
 
         ###Add 10ms delay between shapiro write/read
-        self.writeDelay(out_file, self.calTimeInFrames(10))
+        self.genSwirePing(out_file, self.calTimeInFrames(10), 0, rows, cols)
 
-    def updateShapiroRouteSetting(self, out_file, route_num):
+    def genShapiroRouteSetting(self, out_file, route_num, frame_size):
         '''
-        update shapiro setting for different route
+        Generate shapiro route setup script
         '''
         tblog.infoLog("Shapiro SWIRE route {0} setup" .format(route_num))
-        self.writeShapiroReg(out_file, 0x8035, shapiro_setup[0x8035])
-        self.writeShapiroReg(out_file, 0x8030, shapiro_setup[0x8030])
-        self.writeShapiroReg(out_file, 0x8032, shapiro_setup[0x8032])
+        self.writeShapiroReg(out_file, 0x8030, samplerate_reg_val[self.swire_samplerate])
+        self.writeShapiroReg(out_file, 0x8032, route_num)
+        self.writeShapiroReg(out_file, 0x8035, frame_size)
+
+    def genSwireRouteSetting(self, out_file):
+        '''
+        Generate SWIRE route setup script
+        '''
+        self.genSwirePing(out_file)
+        i = 0;
+        '''
+        FIXME: it seems we have to program these registers in sequence
+        '''
+        for i in range(len(swire_route_properties)):
+            for (k, v) in swire_route_properties.items():
+                if v[swire_reg_seq] == i:
+                    self.writeReadSwireReg(out_file, 1, v[swire_reg_addr], v[swire_reg_val])
+
+    def genSwireFrameShapeSetting(self, out_file):
+        '''
+        Generate SWIRE frame shape setup script
+        '''
+        rows_ctrl = swire_rows_ctrl[self.swire_rows]
+        cols_ctrl = swire_cols_ctrl[self.swire_cols]
+        scp_framectrl_addr = 0x70
+        scp_framectrl_val = (rows_ctrl << 3) + cols_ctrl
+        tblog.infoLog("swire frame control: 0x{0:02x}" .format(scp_framectrl_val))
+
+        self.genSwirePing(out_file)
+        self.writeReadSwireReg(out_file, 1, scp_framectrl_addr, scp_framectrl_val, 15)  #dev=15 to broadcast
+
+    def genSwireStreamStart(self, out_file, rows, cols, ch_en):
+        '''
+        Generate shapiro data stream start script
+        '''
+        line_sstart = r'<Swframe Repeat="1" rows="_STREAM_ROWS_" cols="_STREAM_COLS_" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >' + '\n' + r'   <DataStream Id="A1" >' + '\n' + r'      <Start ChannelEnable="_STREAM_CH_EN_" />' + '\n' + '   </DataStream>\n' + r'   <controlword opcode="0" ssp="0" breq="0" brel="0" reserved="0" />' + '\n' + '</Swframe>\n'
+        line_sstart = line_sstart.replace("_STREAM_ROWS_", str(rows))
+        line_sstart = line_sstart.replace("_STREAM_COLS_", str(cols))
+        line_sstart = line_sstart.replace("_STREAM_CH_EN_", str(ch_en))
+        out_file.write(line_sstart)
+
+    def genSwireStreamLoop(self, out_file, rows, cols, loop=100):
+        '''
+        Generate shapiro data stream transfer script
+        '''
+        line_stream = r'<Loop Repeat="_LOOP_">' + '\n'
+        line_stream = line_stream.replace("_LOOP_", str(loop))
+        out_file.write(line_stream)
+        
+        '''
+        calculate frame loop and enable ssp
+        FIXME: Should be LCM of frame_rate and 15(frames of dynamic sync period)
+                Here use frame_rate*15 temporarily
+        '''
+        self.genSwirePing(out_file, self.swire_samplerate*15, 1, rows, cols)
+
+        out_file.write("</Loop>\n")
 
     def updateSwireSetting(self):
         '''
@@ -514,40 +584,39 @@ class LnkScriptMod(object):
             frame_shape_lut[192][frame_shape_index['dp_tx_offset']] = self.tx_wordlength + 1
             tblog.infoLog("route3 192K frame: {0}" .format(frame_shape_lut[192]))
 
+        #calculate swire DP register based on current DP used
+        for (k, v) in swire_route_properties.items():
+            if re.search('DPRX', k):
+                v[swire_reg_addr] += (self.dp_rx<<8)
+            elif re.search('DPTX', k):
+                v[swire_reg_addr] += (self.dp_tx<<8)
 
         self.swire_rows = frame_shape_lut[self.swire_samplerate][frame_shape_index['row']]
         self.swire_cols = frame_shape_lut[self.swire_samplerate][frame_shape_index['col']]
 
-        #for SCP_FrameCtrl register
-        rows_ctrl = swire_rows_ctrl[self.swire_rows]
-        cols_ctrl = swire_cols_ctrl[self.swire_cols]
-
         rx_sample_interval = (self.swire_bitrate/self.rx_samplerate) - 1
-        swire_route_properties['_DP_RX_'] = self.dp_rx
-        swire_route_properties['_DPRX_WORDLENGTH_'] = self.rx_wordlength
-        swire_route_properties['_DPRX_INTERVAL_LO_'] = rx_sample_interval & 0xff
-        swire_route_properties['_DPRX_INTERVAL_HI_'] = (rx_sample_interval >> 8) & 0xff
-        swire_route_properties['_DPRX_BLOCK_OFFSET_'] = frame_shape_lut[self.swire_samplerate][frame_shape_index['dp_rx_offset']]
-        swire_route_properties['_DPRX_HCTRL_'] = (frame_shape_lut[self.swire_samplerate][frame_shape_index['dp_rx_hstart']] << 4) + (frame_shape_lut[self.swire_samplerate][frame_shape_index['dp_rx_hstop']] & 0xf)
+        swire_route_properties['_DPRX_WORDLENGTH_'][swire_reg_val] = self.rx_wordlength
+        swire_route_properties['_DPRX_INTERVAL_LO_'][swire_reg_val] = rx_sample_interval & 0xff
+        swire_route_properties['_DPRX_INTERVAL_HI_'][swire_reg_val] = (rx_sample_interval >> 8) & 0xff
+        swire_route_properties['_DPRX_BLOCK_OFFSET_'][swire_reg_val] = frame_shape_lut[self.swire_samplerate][frame_shape_index['dp_rx_offset']]
+        swire_route_properties['_DPRX_HCTRL_'][swire_reg_val] = (frame_shape_lut[self.swire_samplerate][frame_shape_index['dp_rx_hstart']] << 4) + (frame_shape_lut[self.swire_samplerate][frame_shape_index['dp_rx_hstop']] & 0xf)
 
         tx_sample_interval = (self.swire_bitrate/self.tx_samplerate) - 1
-        swire_route_properties['_DP_TX_'] = self.dp_tx
-        swire_route_properties['_DPTX_WORDLENGTH_'] = self.tx_wordlength
-        swire_route_properties['_DPTX_INTERVAL_LO_'] = tx_sample_interval & 0xff
-        swire_route_properties['_DPTX_INTERVAL_HI_'] = (tx_sample_interval >> 8) & 0xff
-        swire_route_properties['_DPTX_BLOCK_OFFSET_'] = frame_shape_lut[self.swire_samplerate][frame_shape_index['dp_tx_offset']]
-        swire_route_properties['_DPTX_HCTRL_'] = (frame_shape_lut[self.swire_samplerate][frame_shape_index['dp_tx_hstart']] << 4) + (frame_shape_lut[self.swire_samplerate][frame_shape_index['dp_tx_hstop']] & 0xf)
+        swire_route_properties['_DPTX_WORDLENGTH_'][swire_reg_val] = self.tx_wordlength
+        swire_route_properties['_DPTX_INTERVAL_LO_'][swire_reg_val] = tx_sample_interval & 0xff
+        swire_route_properties['_DPTX_INTERVAL_HI_'][swire_reg_val] = (tx_sample_interval >> 8) & 0xff
+        swire_route_properties['_DPTX_BLOCK_OFFSET_'][swire_reg_val] = frame_shape_lut[self.swire_samplerate][frame_shape_index['dp_tx_offset']]
+        swire_route_properties['_DPTX_HCTRL_'][swire_reg_val] = (frame_shape_lut[self.swire_samplerate][frame_shape_index['dp_tx_hstart']] << 4) + (frame_shape_lut[self.swire_samplerate][frame_shape_index['dp_tx_hstop']] & 0xf)
 
-        swire_route_properties['_SCP_FRAMECTRL_'] = (rows_ctrl << 3) + cols_ctrl
-        tblog.infoLog("route3 swire frame control: 0x{0:02x}" .format(swire_route_properties['_SCP_FRAMECTRL_']))
         '''
         update multiple channel setting
         FIXME: currently only support 2-ch
         '''
         if self.channel_num == 2:
-            swire_route_properties['_CHANNEL_PREPARE_'] = 3
-            swire_route_properties['_CHANNEL_EN_'] = 3
-            tblog.infoLog("route channel control: 0x{0:02x}" .format(swire_route_properties['_CHANNEL_EN_']))
+            swire_route_properties['_DPRX_CHANNEL_PREPARE_'][swire_reg_val] = 3
+            swire_route_properties['_DPRX_CHANNEL_EN_'][swire_reg_val] = 3
+            swire_route_properties['_DPTX_CHANNEL_PREPARE_'][swire_reg_val] = 3
+            swire_route_properties['_DPTX_CHANNEL_EN_'][swire_reg_val] = 3
 
     def setupRouteScript(self, route_num, output_dir, rx_samplerate, rx_wordlength, tx_samplerate, tx_wordlength, frame_size):
         '''
@@ -596,36 +665,43 @@ class LnkScriptMod(object):
         if frame_size < 1:
             frame_size = 0
 
-        start_swire_setup = 0
         with open(template) as route_in, open(route_script, 'w') as route_out:
             for line in route_in:
                 '''
-                fill the content for shaprio setup
+                Gen script for shaprio route setup
                 '''
                 if re.search('start shapiro setup', line):
                     route_out.write(line)
-                    shapiro_setup[0x8030] = samplerate_reg_val[self.swire_samplerate]
-                    shapiro_setup[0x8032] = route_num
-                    shapiro_setup[0x8035] = frame_size
-
-                    self.updateShapiroRouteSetting(route_out, route_num)
+                    self.genShapiroRouteSetting(route_out, route_num, frame_size)
                     continue
 
                 '''
-                update swire setup
+                gen script for swire route setup
                 '''
                 if re.search('start swire channel setup', line):
-                    start_swire_setup = 1
-                elif re.search('end swire channel setup', line):
-                    start_swire_setup = 0
+                    route_out.write(line)
+                    self.genSwireRouteSetting(route_out)
+                    self.genSwireFrameShapeSetting(route_out)
+                    continue
 
-                if start_swire_setup:
-                    #fill in swire channel/DP properties from table
-                    for (k, v) in swire_route_properties.items():
-                        if re.search(k, line):
-                            line = line.replace(k, ("0x{0:02X}" .format(v)))
-                            continue
-                else:
+                '''
+                gen script for swire data stream transfer and close 
+                '''
+                if re.search('data stream start', line):
+                    self.genSwireStreamStart(route_out, self.swire_rows, self.swire_cols, swire_route_properties['_DPRX_CHANNEL_EN_'][swire_reg_val])
+                    self.genSwireStreamLoop(route_out, self.swire_rows, self.swire_cols)
+
+                    #disable swire channel
+                    self.writeReadSwireReg(route_out, 1,  swire_route_properties['_DPRX_CHANNEL_EN_'][swire_reg_addr], 0, 1,  self.swire_rows, self.swire_cols)
+                    self.writeReadSwireReg(route_out, 1,  swire_route_properties['_DPTX_CHANNEL_EN_'][swire_reg_addr], 0, 1,  self.swire_rows, self.swire_cols)
+                    #delay 2 ms
+                    self.genSwirePing(route_out, self.calTimeInFrames(2), 0, self.swire_rows, self.swire_cols)
+                    #stop shapiro route
+                    self.writeShapiroReg(route_out, 0x8033, 0, 1, self.swire_rows, self.swire_cols)
+
+                    continue
+
+                if 1:
                     line_updated = 0
                     if re.search('_DATE_', line):
                         #update date
@@ -672,40 +748,9 @@ class LnkScriptMod(object):
                             stream_ch_en = 3
                         line = line.replace("_STREAM_CH_EN_", str(stream_ch_en))
                         line_updated = 1
-                    '''
-                    update swire route setup
-                    '''
-                    if re.search('_DP_RX_', line) or re.search('_DP_TX_', line):
-                        line = line.replace("_DP_RX_", ("0x{0:02X}" .format(self.dp_rx)))
-                        line = line.replace("_DP_TX_", ("0x{0:02X}" .format(self.dp_tx)))
-                        line_updated = 1
-                    if re.search('_STREAM_ROWS_', line) or re.search('_STREAM_COLS_', line):
-                        #update stream frame shape rows and cols
-                        line = line.replace("_STREAM_ROWS_", str(self.swire_rows))
-                        line = line.replace("_STREAM_COLS_", str(self.swire_cols))
-                        line_updated = 1
-                    '''
-                    update other misc items
-                    '''
-                    if re.search('_DELAY_10MS_', line):
-                        #update frames for delay
-                        line = line.replace("_DELAY_10MS_", str(self.calTimeInFrames(10)))
-                        line_updated = 1
-                    if re.search('_DELAY_2MS_', line):
-                        #update frames for delay
-                        line = line.replace("_DELAY_2MS_", str(self.calTimeInFrames(2)))
-                        line_updated = 1
-                    if re.search('_LOOP_FRAME_', line):
-                        '''
-                        update frame loop
-                        FIXME: Should be LCM of frame_rate and 15(frames of dynamic sync period)
-                               Here use frame_rate*15 temporarily
-                        '''
-                        line = line.replace("_LOOP_FRAME_", str(self.swire_samplerate * 15))
-                        line_updated = 1
 
                     if line_updated:
-                        tblog.infoLog("route3 updated: {0}" .format(line))
+                        tblog.infoLog("route setup script updated: {0}" .format(line))
 
                 route_out.write(line)
 
