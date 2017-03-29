@@ -91,14 +91,8 @@
          SFrameStartChar="-" 
          timedc="8000" />
  
-<!-- LHDEBUG Route automation: start stream define -->
-   <!-- Stream A1 -->
-   <DataStream Id="A1">
-      <Structure Channels="_CHANNEL_NUM_" Interval="_INTERVAL_" Hstart="1" Hstop="1" Offset="0" Length="_WORDLENGTH_" Protocol="0" BlockPackingMode="0" BlockGroupCount="1" SubOffset="0" Lane="0" />
-      <Content ChID="_CHANNEL_ID_0_" Wave="_INPUT_WAVEFORM_" Freq="1000" N="_FRAME_RATE_" M="1" Amplitude="-_AMP_dBFs" />
-      <Content ChID="_CHANNEL_ID_1_" Wave="_INPUT_WAVEFORM_" Freq="1000" N="_FRAME_RATE_" M="1" Amplitude="-_AMP_dBFs" />
-   </DataStream>
-<!-- LHDEBUG Route automation: end stream define -->
+<!-- Route automation: start stream define -->
+<!-- Route automation: end stream define -->
  
 </Init>
  
@@ -154,19 +148,6 @@
    <!-- Event #17 : WRITE -->
    <controlword opcode="3" DeviceAddress="0" RegisterAddress="0x0046" Data="0x01" />
    <Comment="End of Macro DEVICE ENUMERATION"/>
-</Swframe>
- 
-<!-- Event #19 : Frame Start -->
-<Swframe Repeat="13" rows="48" cols="2" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >
-   <!-- Event #20 : PING -->
-   <controlword opcode="0" ssp="0" breq="0" brel="0" reserved="0" />
-   <Comment="Set Buffer Size"/>
-</Swframe>
- 
-<!-- Event #22 : Frame Start -->
-<Swframe Repeat="15" rows="48" cols="2" preq="0" StaticSync="177" Phy="0" DynamicSync="Valid" Parity="Valid" nak="0" ack="0" >
-   <!-- Event #23 : PING -->
-   <controlword opcode="0" ssp="0" breq="0" brel="0" reserved="0" />
 </Swframe>
  
 <!-- Route automation: start shapiro setup -->

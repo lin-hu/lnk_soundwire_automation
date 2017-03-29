@@ -173,9 +173,9 @@ class LnkScriptMod(object):
         self.dp_rx = 3
         self.dp_tx = 1
         self.swire_bitrate = 24576 #K : default 12.288MHZ with double date rate
-        self.rx_wordlength = 24  #bit
+        self.rx_wordlength = 23  #bit
         self.rx_samplerate = 48  #KHz
-        self.tx_wordlength = 24  #bit
+        self.tx_wordlength = 23  #bit
         self.tx_samplerate = 48  #KHz
         self.swire_rows = 48
         self.swire_cols = 2
@@ -542,6 +542,33 @@ class LnkScriptMod(object):
         self.genSwirePing(out_file)
         self.writeReadSwireReg(out_file, 1, scp_framectrl_addr, scp_framectrl_val, 15)  #dev=15 to broadcast
 
+    def genSwireStream(self, out_file):
+        '''
+        Generate SWIRE data stream definition script
+        '''
+        line_stream = r'   <DataStream Id="A1">' + '\n' + r'      <Structure Channels="_CHANNEL_NUM_" Interval="_INTERVAL_" Hstart="1" Hstop="1" Offset="0" Length="_WORDLENGTH_" Protocol="0" BlockPackingMode="0" BlockGroupCount="1" SubOffset="0" Lane="0" />' + '\n' + '_CONTENT_   </DataStream>\n'
+        line_content_t = r'      <Content ChID="_CHANNEL_ID_" Wave="_INPUT_WAVEFORM_" Freq="1000" N="_FRAME_RATE_" M="1" Amplitude="-_AMP_dBFs" />' + '\n'
+
+        line_stream = line_stream.replace("_INTERVAL_", str(self.swire_bitrate/self.rx_samplerate))
+        line_stream = line_stream.replace("_CHANNEL_NUM_", str(self.channel_num))
+        line_stream = line_stream.replace("_WORDLENGTH_", str(self.rx_wordlength+1)) #stream def requires real length
+
+        line_content = ""
+        for i in range(self.channel_num):
+            line = line_content_t.replace('_CHANNEL_ID_', str(i))
+            line = line.replace("_FRAME_RATE_", str(self.swire_bitrate/(self.swire_rows*self.swire_cols)))
+            if self.input_pcm:
+                line = line.replace("_INPUT_WAVEFORM_", 'sine')
+                line = line.replace("_AMP_", '3')
+            else:
+                line = line.replace("_INPUT_WAVEFORM_", 'pdm_sine')
+                line = line.replace("_AMP_", '16')
+            line_content += line
+
+        line_stream = line_stream.replace('_CONTENT_', line_content)
+        out_file.write(line_stream)
+        tblog.infoLog("swire data stream content: {0}" .format(line_stream))
+
     def genSwireStreamStart(self, out_file, rows, cols, ch_en):
         '''
         Generate shapiro data stream start script
@@ -587,8 +614,10 @@ class LnkScriptMod(object):
         #calculate swire DP register based on current DP used
         for (k, v) in swire_route_properties.items():
             if re.search('DPRX', k):
+                v[swire_reg_addr] &= 0xff
                 v[swire_reg_addr] += (self.dp_rx<<8)
             elif re.search('DPTX', k):
+                v[swire_reg_addr] &= 0xff
                 v[swire_reg_addr] += (self.dp_tx<<8)
 
         self.swire_rows = frame_shape_lut[self.swire_samplerate][frame_shape_index['row']]
@@ -617,6 +646,12 @@ class LnkScriptMod(object):
             swire_route_properties['_DPRX_CHANNEL_EN_'][swire_reg_val] = 3
             swire_route_properties['_DPTX_CHANNEL_PREPARE_'][swire_reg_val] = 3
             swire_route_properties['_DPTX_CHANNEL_EN_'][swire_reg_val] = 3
+        else:
+            swire_route_properties['_DPRX_CHANNEL_PREPARE_'][swire_reg_val] = 1
+            swire_route_properties['_DPRX_CHANNEL_EN_'][swire_reg_val] = 1
+            swire_route_properties['_DPTX_CHANNEL_PREPARE_'][swire_reg_val] = 1
+            swire_route_properties['_DPTX_CHANNEL_EN_'][swire_reg_val] = 1
+
 
     def setupRouteScript(self, route_num, output_dir, rx_samplerate, rx_wordlength, tx_samplerate, tx_wordlength, frame_size):
         '''
@@ -687,7 +722,7 @@ class LnkScriptMod(object):
                 '''
                 gen script for swire data stream transfer and close 
                 '''
-                if re.search('data stream start', line):
+                if re.search('start data stream', line):
                     self.genSwireStreamStart(route_out, self.swire_rows, self.swire_cols, swire_route_properties['_DPRX_CHANNEL_EN_'][swire_reg_val])
                     self.genSwireStreamLoop(route_out, self.swire_rows, self.swire_cols)
 
@@ -698,59 +733,20 @@ class LnkScriptMod(object):
                     self.genSwirePing(route_out, self.calTimeInFrames(2), 0, self.swire_rows, self.swire_cols)
                     #stop shapiro route
                     self.writeShapiroReg(route_out, 0x8033, 0, 1, self.swire_rows, self.swire_cols)
-
                     continue
 
-                if 1:
-                    line_updated = 0
-                    if re.search('_DATE_', line):
-                        #update date
-                        line = line.replace("_DATE_", datetime.datetime.now().strftime("%m/%d/%Y"))
-                        line_updated = 1
-                    '''
-                    update stream info
-                    '''
-                    if re.search('_CHANNEL_NUM_', line):
-                        #update sample_interval/channel_num/word_length in swire stream definition
-                        line = line.replace("_INTERVAL_", str(self.swire_bitrate/rx_samplerate))
-                        line = line.replace("_CHANNEL_NUM_", str(self.channel_num))
-                        line = line.replace("_WORDLENGTH_", str(rx_wordlength))
-                        line_updated = 1
-                    if re.search('_CHANNEL_ID_0_', line):
-                        #update frame_rate/channel_number in swire stream definition
-                        line = line.replace("_FRAME_RATE_", str(self.swire_bitrate/(self.swire_rows*self.swire_cols)))
-                        line = line.replace("_CHANNEL_ID_0_", str(0))
-                        if self.input_pcm:
-                            line = line.replace("_INPUT_WAVEFORM_", 'sine')
-                            line = line.replace("_AMP_", '3')
-                        else:
-                            line = line.replace("_INPUT_WAVEFORM_", 'pdm_sine')
-                            line = line.replace("_AMP_", '16')
-                        line_updated = 1
-                    if re.search('_CHANNEL_ID_1_', line):
-                        #update frame_rate/channel_number in swire stream definition
-                        if self.channel_num > 1:
-                            line = line.replace("_FRAME_RATE_", str(self.swire_bitrate/(self.swire_rows*self.swire_cols)))
-                            line = line.replace("_CHANNEL_ID_1_", str(1))
-                            if self.input_pcm:
-                                line = line.replace("_INPUT_WAVEFORM_", 'sine')
-                                line = line.replace("_AMP_", '3')
-                            else:
-                                line = line.replace("_INPUT_WAVEFORM_", 'pdm_sine')
-                                line = line.replace("_AMP_", '16')
-                            line_updated = 1
-                        else:
-                            continue    #skip this stream
-                    if re.search('_STREAM_CH_EN_', line):
-                        #update stream channel enable
-                        stream_ch_en = 1
-                        if self.channel_num > 1:
-                            stream_ch_en = 3
-                        line = line.replace("_STREAM_CH_EN_", str(stream_ch_en))
-                        line_updated = 1
+                '''
+                gen script for swire data stream def
+                '''
+                if re.search('start stream define', line):
+                    route_out.write(line)
+                    self.genSwireStream(route_out)
+                    continue
 
-                    if line_updated:
-                        tblog.infoLog("route setup script updated: {0}" .format(line))
+                if re.search('_DATE_', line):
+                    #update date
+                    line = line.replace("_DATE_", datetime.datetime.now().strftime("%m/%d/%Y"))
+                    tblog.infoLog("route setup script updated: {0}" .format(line))
 
                 route_out.write(line)
 
@@ -763,9 +759,9 @@ class LnkScriptMod(object):
         '''
         '''
         self.setupRouteScript(3, self.output_path + r'route11\\', 48, 16, 48, 16, 2)
-        self.setupRouteScript(20, self.output_path + r'route11\\', 48, 24, 48, 24, 2)
         '''
         #self.setupRouteScript(11, self.output_path + r'route11\\', 768, 1, 48, 24, 2)
+        self.setupRouteScript(20, self.output_path + r'route11\\', 48, 24, 48, 24, 2)
         self.setupRouteScript(13, self.output_path + r'route11\\', 768, 1, 768, 1, 8)
 
 if __name__ == "__main__":
