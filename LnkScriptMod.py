@@ -511,9 +511,9 @@ class LnkScriptMod(object):
         Generate shapiro route setup script
         '''
         tblog.infoLog("Shapiro SWIRE route {0} setup" .format(route_num))
+        self.writeShapiroReg(out_file, 0x8035, frame_size)
         self.writeShapiroReg(out_file, 0x8030, samplerate_reg_val[self.swire_samplerate])
         self.writeShapiroReg(out_file, 0x8032, route_num)
-        self.writeShapiroReg(out_file, 0x8035, frame_size)
 
     def genSwireRouteSetting(self, out_file):
         '''
@@ -679,6 +679,7 @@ class LnkScriptMod(object):
         FIXME: will handle PDM pass through later!!!
         '''
         if self.dp_rx == 3:
+            self.input_pcm = 1
             self.swire_samplerate = self.rx_samplerate
         elif self.dp_rx == 4:
             self.input_pcm = 0
@@ -760,9 +761,10 @@ class LnkScriptMod(object):
         '''
         self.setupRouteScript(3, self.output_path + r'route11\\', 48, 16, 48, 16, 2)
         '''
-        #self.setupRouteScript(11, self.output_path + r'route11\\', 768, 1, 48, 24, 2)
-        self.setupRouteScript(20, self.output_path + r'route11\\', 48, 24, 48, 24, 2)
-        self.setupRouteScript(13, self.output_path + r'route11\\', 768, 1, 768, 1, 8)
+        self.setupRouteScript(11, self.output_path + r'route11\\', 768, 1, 48, 24, 2)
+        self.setupRouteScript(20, self.output_path + r'debug\\', 48, 24, 48, 24, 2)
+        self.setupRouteScript(13, self.output_path + r'debug\\', 768, 1, 768, 1, 8)
+        self.setupRouteScript(3, self.output_path + r'debug\\', 48, 16, 48, 16, 2)
 
 if __name__ == "__main__":
     tblog.setDebugMode(True)
