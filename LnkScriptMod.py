@@ -189,6 +189,7 @@ class LnkScriptMod(object):
         self.swire_rows = 48
         self.swire_cols = 2
         self.input_pcm = 1
+        self.swire_framerate = 48
 
         '''
         ##############################################################
@@ -269,7 +270,7 @@ class LnkScriptMod(object):
         modify LnK data port script template to update downloadable data file
         '''
         if not os.path.isfile(self.output_path + self.sys_xml_template_file):
-            raise BellagioError("Could not find LnK DP DL script file for sys config!")
+            raise BellagioError("Could not find LnK DP DL script file for sys config! {0}" .format(self.output_path + self.sys_xml_template_file))
 
         '''
         ###convert binary to DP DL file
@@ -298,7 +299,7 @@ class LnkScriptMod(object):
             for line in infile:
                 if re.search(self.fw_txt_replace, line):
                     #update DP DL txt file
-                    line = line.replace(self.fw_txt_replace, self.output_path+self.sys_txt_file)
+                    line = line.replace(self.fw_txt_replace, self.output_path+self.fw_txt_file)
                 elif re.search('_DATE_', line):
                     #update date
                     line = line.replace("_DATE_", datetime.datetime.now().strftime("%m/%d/%Y"))
@@ -308,6 +309,7 @@ class LnkScriptMod(object):
         outfile.close()
 
         tblog.infoLog("LnkScriptMod: LnK script xml file revised!")
+        return self.sys_xml_file, self.fw_xml_file
 
     '''
     ##############################################################
@@ -427,6 +429,8 @@ class LnkScriptMod(object):
         if not os.path.isfile(self.output_path + self.fw_file):
             raise BellagioError("Could not find Bosko FW bin!")
         self.bin2CtrlPort(self.output_path+self.fw_file, self.output_path+self.cp_dl_fw_file)
+        
+        return self.cp_dl_sys_file, self.cp_dl_fw_file
 
     '''
     ##############################################################
@@ -800,6 +804,7 @@ class LnkScriptMod(object):
 
         route_in.close()
         route_out.close()
+        return route_script
 
     def genRouteScript(self):
         '''
